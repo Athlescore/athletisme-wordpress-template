@@ -208,18 +208,34 @@ add_shortcode('athle_map', function (): string {
     $id  = $post->ID ?? 0;
     $lat = (float) get_post_meta($id, '_event_lat', true);
     $lng = (float) get_post_meta($id, '_event_lng', true);
-    $loc = get_post_meta($id, '_event_location', true) ?: get_the_title($id);
+    $loc = get_post_meta($id, '_event_location', true) ?: '';
 
     if (!$lat || !$lng) {
         return '<p style="color:#888;font-size:.9rem;border:1px dashed #ccc;padding:.6rem .9rem;border-radius:6px">'
              . '📍 Carte disponible après renseignement et sauvegarde de l\'adresse.</p>';
     }
 
-    $map_id = 'athle-map-' . $id;
-    $GLOBALS['athle_maps'][$map_id] = ['lat' => $lat, 'lng' => $lng, 'popup' => $loc];
+    $map_id  = 'athle-map-' . $id;
+    $title   = esc_html(get_the_title($id));
+    $address = nl2br(esc_html($loc));
+    $osm_url = esc_url('https://www.openstreetmap.org/?mlat=' . $lat . '&mlon=' . $lng . '#map=15/' . $lat . '/' . $lng);
+    $popup   = esc_js($loc ?: $title);
+
+    $GLOBALS['athle_maps'][$map_id] = ['lat' => $lat, 'lng' => $lng, 'popup' => $popup];
 
     wp_enqueue_style('leaflet',  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css', [], '1.9.4');
     wp_enqueue_script('leaflet', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',  [], '1.9.4', true);
+    wp_add_inline_style('leaflet', '
+        .athle-map-card{border:1.5px solid var(--line,#e0e0e0);border-radius:12px;overflow:hidden;margin:1rem 0;background:var(--chalk,#fff)}
+        .athle-map-card__header{display:flex;align-items:flex-start;gap:.75rem;padding:.9rem 1rem;border-bottom:1px solid var(--line,#e0e0e0)}
+        .athle-map-card__header svg{flex-shrink:0;margin-top:.15rem;color:var(--track,#c0392b)}
+        .athle-map-card__name{display:block;font-size:.95rem;font-weight:700;color:var(--ink,#111);margin-bottom:.15rem}
+        .athle-map-card__addr{font-size:.82rem;color:var(--steel,#555);line-height:1.5}
+        .athle-map-card__map{height:280px}
+        .athle-map-card__footer{padding:.6rem 1rem;border-top:1px solid var(--line,#e0e0e0);font-size:.82rem}
+        .athle-map-card__footer a{color:var(--track,#c0392b);font-weight:600;text-decoration:none}
+        .athle-map-card__footer a:hover{text-decoration:underline}
+    ');
 
     static $footer_hooked = false;
     if (!$footer_hooked) {
@@ -242,7 +258,22 @@ window.addEventListener('load',function(){
         $footer_hooked = true;
     }
 
-    return '<div id="' . esc_attr($map_id) . '" style="height:320px;border-radius:10px;margin:1rem 0"></div>';
+    $pin_icon = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+
+    return '
+<div class="athle-map-card">
+  <div class="athle-map-card__header">
+    ' . $pin_icon . '
+    <div>
+      <strong class="athle-map-card__name">' . $title . '</strong>
+      ' . ($address ? '<span class="athle-map-card__addr">' . $address . '</span>' : '') . '
+    </div>
+  </div>
+  <div id="' . esc_attr($map_id) . '" class="athle-map-card__map"></div>
+  <div class="athle-map-card__footer">
+    <a href="' . $osm_url . '" target="_blank" rel="noopener noreferrer">Voir l\'itinéraire sur OpenStreetMap →</a>
+  </div>
+</div>';
 });
 
 // ── Templates de blocs par type d'événement ──────────────────────────────────
