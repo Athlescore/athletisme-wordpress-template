@@ -444,3 +444,42 @@ function athle_setup_front_page(): void
     }
 }
 add_action('after_switch_theme', 'athle_setup_front_page');
+
+// ── Mises à jour automatiques depuis GitHub ───────────────────────────────────
+
+function athle_check_theme_update(object $transient): object
+{
+    if (empty($transient->checked)) return $transient;
+
+    $slug    = 'athle-sud-69';
+    $current = wp_get_theme($slug)->get('Version');
+
+    $response = get_transient('athle_github_update_check');
+
+    if ($response === false) {
+        $response = wp_remote_get(
+            'https://api.github.com/repos/Athlescore/athletisme-wordpress-template/releases/latest',
+            ['headers' => ['Accept' => 'application/vnd.github.v3+json'], 'timeout' => 8]
+        );
+        set_transient('athle_github_update_check', $response, 12 * HOUR_IN_SECONDS);
+    }
+
+    if (is_wp_error($response)) return $transient;
+
+    $data = json_decode(wp_remote_retrieve_body($response), true);
+    if (empty($data['tag_name'])) return $transient;
+
+    $latest = ltrim($data['tag_name'], 'v');
+
+    if (version_compare($latest, $current, '>')) {
+        $transient->response[$slug] = [
+            'theme'       => $slug,
+            'new_version' => $latest,
+            'url'         => 'https://github.com/Athlescore/athletisme-wordpress-template',
+            'package'     => $data['zipball_url'] ?? '',
+        ];
+    }
+
+    return $transient;
+}
+add_filter('pre_set_site_transient_update_themes', 'athle_check_theme_update');
