@@ -105,6 +105,24 @@ function athle_register_cpts(): void
 }
 add_action('init', 'athle_register_cpts');
 
+// Modifier la query de l'archive événements : tri par date, événements à venir uniquement
+function athle_event_archive_query(\WP_Query $query): void
+{
+    if (is_admin() || !$query->is_main_query() || !$query->is_post_type_archive('athle_event')) return;
+
+    $query->set('meta_key',      '_event_date');
+    $query->set('orderby',       'meta_value');
+    $query->set('order',         'ASC');
+    $query->set('posts_per_page', 12);
+    $query->set('meta_query', [[
+        'key'     => '_event_date',
+        'value'   => date('Y-m-d'),
+        'compare' => '>=',
+        'type'    => 'DATE',
+    ]]);
+}
+add_action('pre_get_posts', 'athle_event_archive_query');
+
 // ── Meta boxes ───────────────────────────────────────────────────────────────
 
 function athle_register_meta_boxes(): void
