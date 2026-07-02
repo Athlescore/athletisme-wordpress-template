@@ -1,0 +1,16 @@
+#!/bin/bash
+
+while read local_ref local_sha remote_ref remote_sha; do
+    if [ "$remote_ref" = "refs/heads/main" ]; then
+        echo ""
+        echo "  Push direct sur main interdit."
+        echo "  Crée une branche et ouvre une Pull Request :"
+        echo ""
+        echo "    git checkout -b feature/ma-fonctionnalite"
+        echo "    git push -u origin feature/ma-fonctionnalite"
+        echo ""
+        exit 1
+    fi
+done
+
+exit 0
