@@ -184,18 +184,30 @@ add_shortcode('athle_calendar', function (array $atts): string {
 function athle_parse_result_rows(int $post_id, int $max = 6): array
 {
     $stored = get_post_meta($post_id, '_result_rows', true);
-    // Support ancien format JSON string et nouveau format tableau PHP
-    $raw = is_array($stored) ? $stored : ($stored ? json_decode($stored, true) : []);
+    $raw    = is_array($stored) ? $stored : ($stored ? json_decode($stored, true) : []);
     $grouped = [];
-    foreach ((array) $raw as $row) {
-        $athlete = $row['athlete'] ?? '';
-        if (!$athlete) continue;
-        $entry = ($row['disc'] ?? '') . (!empty($row['perf']) ? ' — ' . $row['perf'] : '');
-        if (!isset($grouped[$athlete])) {
-            if (count($grouped) >= $max) break;
-            $grouped[$athlete] = [];
+    foreach ((array) $raw as $item) {
+        if (isset($item['perfs'])) {
+            // Nouveau format {athlete, perfs:[{disc,perf,place}]}
+            $athlete = $item['athlete'] ?? '';
+            if (!$athlete) continue;
+            if (!isset($grouped[$athlete])) {
+                if (count($grouped) >= $max) break;
+                $grouped[$athlete] = [];
+            }
+            foreach ((array) $item['perfs'] as $p) {
+                $grouped[$athlete][] = ($p['disc'] ?? '') . (!empty($p['perf']) ? ' — ' . $p['perf'] : '');
+            }
+        } else {
+            // Ancien format plat {athlete, disc, perf, place}
+            $athlete = $item['athlete'] ?? '';
+            if (!$athlete) continue;
+            if (!isset($grouped[$athlete])) {
+                if (count($grouped) >= $max) break;
+                $grouped[$athlete] = [];
+            }
+            $grouped[$athlete][] = ($item['disc'] ?? '') . (!empty($item['perf']) ? ' — ' . $item['perf'] : '');
         }
-        $grouped[$athlete][] = $entry;
     }
     return $grouped;
 }

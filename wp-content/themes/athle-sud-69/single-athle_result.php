@@ -7,8 +7,6 @@ $id       = get_the_ID();
 $date     = get_post_meta($id, '_result_date', true);
 $location = get_post_meta($id, '_result_location', true);
 $category = get_post_meta($id, '_result_category', true);
-$raw_rows = get_post_meta($id, '_result_rows', true);
-$rows     = is_array($raw_rows) ? $raw_rows : ($raw_rows ? json_decode($raw_rows, true) : []);
 
 $cats_lbl = [
     'poussin' => 'Poussin (U10)', 'pupille' => 'Pupille (U12)',
@@ -17,6 +15,26 @@ $cats_lbl = [
     'espoir'  => 'Espoir (U23)', 'senior'  => 'Senior',
     'master'  => 'Master',       'mixte'   => 'Toutes catégories',
 ];
+
+$stored   = get_post_meta($id, '_result_rows', true);
+$raw      = is_array($stored) ? $stored : ($stored ? json_decode($stored, true) : []);
+
+// Normalise ancien format plat vers nouveau format groupé
+$athletes = [];
+foreach ((array) $raw as $item) {
+    if (isset($item['perfs'])) {
+        $athletes[] = $item;
+    } else {
+        $name  = $item['athlete'] ?? '';
+        $entry = ['disc' => $item['disc'] ?? '', 'perf' => $item['perf'] ?? '', 'place' => $item['place'] ?? ''];
+        $found = false;
+        foreach ($athletes as &$a) {
+            if ($a['athlete'] === $name) { $a['perfs'][] = $entry; $found = true; break; }
+        }
+        unset($a);
+        if (!$found) $athletes[] = ['athlete' => $name, 'perfs' => [$entry]];
+    }
+}
 ?>
 <div class="wrap">
   <div class="article-head">
@@ -34,7 +52,7 @@ $cats_lbl = [
   </div>
 </div>
 
-<?php if (!empty($rows)): ?>
+<?php if (!empty($athletes)): ?>
 <div class="wrap">
   <div class="result-table-wrap">
     <table class="result-table">
@@ -47,14 +65,21 @@ $cats_lbl = [
         </tr>
       </thead>
       <tbody>
-        <?php foreach ($rows as $row): ?>
+        <?php foreach ($athletes as $item):
+            $perfs = array_values($item['perfs'] ?? []);
+            $count = count($perfs);
+            foreach ($perfs as $i => $p): ?>
         <tr>
-          <td><strong><?php echo esc_html($row['athlete'] ?? ''); ?></strong></td>
-          <td><?php echo esc_html($row['disc'] ?? ''); ?></td>
-          <td><strong><?php echo esc_html($row['perf'] ?? ''); ?></strong></td>
-          <td><?php echo esc_html($row['place'] ?? ''); ?></td>
+          <?php if ($i === 0): ?>
+          <td<?php echo $count > 1 ? ' rowspan="' . $count . '" style="vertical-align:top"' : ''; ?>>
+            <strong><?php echo esc_html($item['athlete']); ?></strong>
+          </td>
+          <?php endif; ?>
+          <td><?php echo esc_html($p['disc'] ?? ''); ?></td>
+          <td><strong><?php echo esc_html($p['perf'] ?? ''); ?></strong></td>
+          <td><?php echo esc_html($p['place'] ?? ''); ?></td>
         </tr>
-        <?php endforeach; ?>
+        <?php endforeach; endforeach; ?>
       </tbody>
     </table>
   </div>
