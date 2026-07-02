@@ -34,12 +34,13 @@ add_action('init', function (): void {
             'add_new_item'  => 'Ajouter un résultat',
             'edit_item'     => 'Modifier le résultat',
         ],
-        'public'       => true,
-        'show_in_menu' => true,
-        'menu_icon'    => 'dashicons-awards',
-        'supports'     => ['title', 'editor'],
-        'has_archive'  => true,
-        'rewrite'      => ['slug' => 'resultats'],
+        'public'        => true,
+        'show_in_menu'  => true,
+        'show_in_rest'  => true,
+        'menu_icon'     => 'dashicons-awards',
+        'supports'      => ['title', 'editor'],
+        'has_archive'   => true,
+        'rewrite'       => ['slug' => 'resultats'],
     ]);
 
     register_post_type('athle_record', [
@@ -59,8 +60,9 @@ add_action('init', function (): void {
 // ── Meta boxes ───────────────────────────────────────────────────────────────
 
 add_action('add_meta_boxes', function (): void {
-    add_meta_box('athle_event_meta', 'Détails de l\'événement', 'athle_event_meta_cb', 'athle_event', 'normal');
-    add_meta_box('athle_record_meta', 'Détails du record',      'athle_record_meta_cb', 'athle_record', 'normal');
+    add_meta_box('athle_event_meta',  'Détails de l\'événement', 'athle_event_meta_cb',  'athle_event',  'normal');
+    add_meta_box('athle_result_meta', 'Détails du résultat',     'athle_result_meta_cb', 'athle_result', 'normal');
+    add_meta_box('athle_record_meta', 'Détails du record',       'athle_record_meta_cb', 'athle_record', 'normal');
 });
 
 function athle_event_meta_cb(WP_Post $post): void
@@ -89,6 +91,36 @@ function athle_event_meta_cb(WP_Post $post): void
         'other'       => 'Autre',
     ] as $val => $lbl) {
         echo '<option value="' . esc_attr($val) . '"' . selected($type, $val, false) . '>' . esc_html($lbl) . '</option>';
+    }
+    echo '</select></label></p>';
+}
+
+function athle_result_meta_cb(WP_Post $post): void
+{
+    $date     = get_post_meta($post->ID, '_result_date', true);
+    $location = get_post_meta($post->ID, '_result_location', true);
+    $category = get_post_meta($post->ID, '_result_category', true);
+    wp_nonce_field('athle_result_meta', 'athle_result_nonce');
+    echo '<p><label><strong>Date de la compétition</strong><br>
+          <input type="date" name="result_date" value="' . esc_attr($date) . '" style="width:100%;margin-top:.3rem"></label></p>';
+    echo '<p><label><strong>Lieu</strong><br>
+          <input type="text" name="result_location" value="' . esc_attr($location) . '" style="width:100%;margin-top:.3rem" placeholder="ex: Stade de Gerland, Lyon"></label></p>';
+    echo '<p><label><strong>Catégorie</strong><br>
+          <select name="result_category" style="width:100%;margin-top:.3rem">';
+    foreach ([
+        ''        => '— Non précisée —',
+        'poussin' => 'Poussin (U10)',
+        'pupille' => 'Pupille (U12)',
+        'benjam'  => 'Benjamin (U14)',
+        'minime'  => 'Minime (U16)',
+        'cadet'   => 'Cadet (U18)',
+        'junior'  => 'Junior (U20)',
+        'espoir'  => 'Espoir (U23)',
+        'senior'  => 'Senior',
+        'master'  => 'Master',
+        'mixte'   => 'Toutes catégories',
+    ] as $val => $lbl) {
+        echo '<option value="' . esc_attr($val) . '"' . selected($category, $val, false) . '>' . esc_html($lbl) . '</option>';
     }
     echo '</select></label></p>';
 }
@@ -170,6 +202,14 @@ add_action('save_post_athle_event', function (int $post_id): void {
                 update_post_meta($post_id, '_event_lng', $coords['lng']);
             }
         }
+    }
+});
+
+add_action('save_post_athle_result', function (int $post_id): void {
+    if (!isset($_POST['athle_result_nonce']) || !wp_verify_nonce($_POST['athle_result_nonce'], 'athle_result_meta')) return;
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
+    foreach (['result_date' => '_result_date', 'result_location' => '_result_location', 'result_category' => '_result_category'] as $field => $meta) {
+        if (isset($_POST[$field])) update_post_meta($post_id, $meta, sanitize_text_field($_POST[$field]));
     }
 });
 
@@ -360,4 +400,68 @@ add_action('admin_menu', function (): void {
             'post-new.php?post_type=athle_event&event_type=' . $type
         );
     }
+
+    add_submenu_page(
+        'edit.php?post_type=athle_result',
+        '+ Nouveau résultat', '+ Nouveau résultat',
+        'edit_posts',
+        'post-new.php?post_type=athle_result'
+    );
 });
+
+// ── Colonnes admin — Résultats ───────────────────────────────────────────────
+
+add_filter('manage_athle_result_posts_columns', function (array $cols): array {
+    unset($cols['date']);
+    return array_merge($cols, [
+        'result_date'     => 'Date',
+        'result_location' => 'Lieu',
+        'result_category' => 'Catégorie',
+    ]);
+});
+
+add_action('manage_athle_result_posts_custom_column', function (string $col, int $post_id): void {
+    $categories = [
+        'poussin' => 'Poussin (U10)', 'pupille' => 'Pupille (U12)',
+        'benjam'  => 'Benjamin (U14)', 'minime' => 'Minime (U16)',
+        'cadet'   => 'Cadet (U18)',   'junior' => 'Junior (U20)',
+        'espoir'  => 'Espoir (U23)',  'senior' => 'Senior',
+        'master'  => 'Master',        'mixte'  => 'Toutes catégories',
+    ];
+    match ($col) {
+        'result_date'     => print(esc_html(get_post_meta($post_id, '_result_date', true) ?: '—')),
+        'result_location' => print(esc_html(get_post_meta($post_id, '_result_location', true) ?: '—')),
+        'result_category' => print(esc_html($categories[get_post_meta($post_id, '_result_category', true)] ?? '—')),
+        default           => null,
+    };
+}, 10, 2);
+
+add_filter('manage_edit-athle_result_sortable_columns', function (array $cols): array {
+    $cols['result_date'] = 'result_date';
+    return $cols;
+});
+
+add_action('pre_get_posts', function (WP_Query $q): void {
+    if (!is_admin() || $q->get('post_type') !== 'athle_result' || !$q->is_main_query()) return;
+    if ($q->get('orderby') === 'result_date') {
+        $q->set('meta_key', '_result_date');
+        $q->set('orderby', 'meta_value');
+    }
+});
+
+// ── Template de blocs — Résultats ────────────────────────────────────────────
+
+add_filter('default_content', function (string $content, WP_Post $post): string {
+    if ($post->post_type !== 'athle_result') return $content;
+    return <<<'BLOCKS'
+<!-- wp:paragraph -->
+<p>Compte-rendu de la compétition...</p>
+<!-- /wp:paragraph -->
+<!-- wp:heading {"level":3} -->
+<h3>Résultats</h3>
+<!-- /wp:heading -->
+<!-- wp:table {"hasFixedLayout":true} -->
+<figure class="wp-block-table"><table><thead><tr><th>Athlète</th><th>Discipline</th><th>Performance</th><th>Place</th></tr></thead><tbody><tr><td></td><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td><td></td></tr></tbody></table></figure>
+<!-- /wp:table -->
+BLOCKS;
+}, 10, 2);
