@@ -98,13 +98,35 @@ add_shortcode('athle_news', function (array $atts): string {
     return ob_get_clean();
 });
 
-// ── [athle_calendar count="5"] ────────────────────────────────────────────────
+// ── [athle_calendar count="5" types="competition,club"] ───────────────────
 
 add_shortcode('athle_calendar', function (array $atts): string {
-    $a    = shortcode_atts(['count' => 5, 'title' => 'Prochains événements', 'eyebrow' => 'Agenda'], $atts);
-    $mois = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
-    $types = ['competition' => 'Compétition', 'training' => 'Entraînement', 'meeting' => 'Réunion', 'other' => 'Autre'];
-    ob_start();
+    $a = shortcode_atts([
+        'count'   => 5,
+        'title'   => 'Prochains événements',
+        'eyebrow' => 'Agenda',
+        'types'   => '',   // vide = tous les types ; ex: "competition,club"
+    ], $atts);
+
+    $mois        = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+    $type_labels = [
+        'competition' => 'Compétition',
+        'club'        => 'Événement club',
+        'training'    => 'Entraînement',
+        'meeting'     => 'Réunion',
+        'other'       => 'Autre',
+    ];
+
+    $meta_query = [
+        'relation' => 'AND',
+        ['key' => '_event_date', 'value' => date('Y-m-d'), 'compare' => '>=', 'type' => 'DATE'],
+    ];
+
+    if (!empty($a['types'])) {
+        $allowed      = array_map('trim', explode(',', $a['types']));
+        $meta_query[] = ['key' => '_event_type', 'value' => $allowed, 'compare' => 'IN'];
+    }
+
     $events = get_posts([
         'post_type'   => 'athle_event',
         'numberposts' => (int) $a['count'],
@@ -112,8 +134,10 @@ add_shortcode('athle_calendar', function (array $atts): string {
         'meta_key'    => '_event_date',
         'orderby'     => 'meta_value',
         'order'       => 'ASC',
-        'meta_query'  => [['key' => '_event_date', 'value' => date('Y-m-d'), 'compare' => '>=', 'type' => 'DATE']],
+        'meta_query'  => $meta_query,
     ]);
+
+    ob_start();
     ?>
     <section id="calendrier" class="wrap sec-block">
       <div class="sec-head">
@@ -126,28 +150,27 @@ add_shortcode('athle_calendar', function (array $atts): string {
       <?php if (empty($events)): ?>
         <p style="color:var(--steel);font-size:1.05rem">Aucun événement à venir pour le moment.</p>
       <?php else: ?>
-        <div class="agenda">
+        <div class="calendar-grid">
           <?php foreach ($events as $ev):
             $date     = get_post_meta($ev->ID, '_event_date', true);
             $location = get_post_meta($ev->ID, '_event_location', true);
-            $type     = get_post_meta($ev->ID, '_event_type', true);
+            $type     = get_post_meta($ev->ID, '_event_type', true) ?: 'other';
             $ts       = $date ? strtotime($date) : null;
+            $label    = $type_labels[$type] ?? 'Autre';
           ?>
-          <div class="event reveal">
-            <div class="event-date">
-              <span class="d"><?php echo $ts ? date('d', $ts) : '—'; ?></span>
-              <span class="m"><?php echo $ts ? $mois[(int)date('n', $ts) - 1] : ''; ?></span>
-            </div>
-            <div class="event-main">
-              <h3><?php echo esc_html($ev->post_title); ?></h3>
-              <?php if ($location): ?><div class="where"><?php echo esc_html($location); ?></div><?php endif; ?>
-              <div class="tags">
-                <?php if ($type && isset($types[$type])): ?>
-                  <span class="tag"><?php echo esc_html($types[$type]); ?></span>
-                <?php endif; ?>
+          <a href="<?php echo esc_url(get_permalink($ev->ID)); ?>" class="cal-card cal-type--<?php echo esc_attr($type); ?> reveal">
+            <div class="cal-banner"><?php echo esc_html($label); ?></div>
+            <div class="cal-body">
+              <div class="cal-date">
+                <span class="cal-day"><?php echo $ts ? date('d', $ts) : '—'; ?></span>
+                <span class="cal-month"><?php echo $ts ? $mois[(int)date('n', $ts) - 1] : ''; ?></span>
               </div>
+              <h3 class="cal-title"><?php echo esc_html($ev->post_title); ?></h3>
+              <?php if ($location): ?>
+                <div class="cal-where"><?php echo esc_html($location); ?></div>
+              <?php endif; ?>
             </div>
-          </div>
+          </a>
           <?php endforeach; wp_reset_postdata(); ?>
         </div>
       <?php endif; ?>
