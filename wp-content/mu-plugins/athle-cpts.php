@@ -159,7 +159,7 @@ add_action('save_post_athle_event', function (int $post_id): void {
     }
     // Géocode l'adresse si elle a changé
     if (isset($_POST['event_location'])) {
-        $new_loc = sanitize_text_field($_POST['event_location']);
+        $new_loc = sanitize_textarea_field($_POST['event_location']);
         $old_loc = get_post_meta($post_id, '_event_location', true);
         update_post_meta($post_id, '_event_location', $new_loc);
         if ($new_loc && $new_loc !== $old_loc) {
