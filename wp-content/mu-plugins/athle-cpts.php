@@ -530,8 +530,12 @@ add_filter('manage_edit-athle_result_sortable_columns', function (array $cols): 
 add_action('pre_get_posts', function (WP_Query $q): void {
     if (!is_admin() || $q->get('post_type') !== 'athle_result' || !$q->is_main_query()) return;
     if ($q->get('orderby') === 'result_date') {
-        $q->set('meta_key', '_result_date');
-        $q->set('orderby', 'meta_value');
+        $q->set('meta_query', [
+            'relation' => 'OR',
+            'with_date'    => ['key' => '_result_date', 'compare' => 'EXISTS'],
+            'without_date' => ['key' => '_result_date', 'compare' => 'NOT EXISTS'],
+        ]);
+        $q->set('orderby', ['with_date' => 'DESC', 'post_date' => 'DESC']);
     }
 });
 
