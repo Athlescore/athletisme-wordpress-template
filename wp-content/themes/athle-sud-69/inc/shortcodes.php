@@ -158,7 +158,7 @@ add_shortcode('athle_calendar', function (array $atts): string {
             $ts       = $date ? strtotime($date) : null;
             $label    = $type_labels[$type] ?? 'Autre';
           ?>
-          <div class="cal-card cal-type--<?php echo esc_attr($type); ?> reveal">
+          <a href="<?php echo esc_url(get_permalink($ev->ID)); ?>" class="cal-card cal-type--<?php echo esc_attr($type); ?> reveal">
             <div class="cal-banner"><?php echo esc_html($label); ?></div>
             <div class="cal-body">
               <div class="cal-date">
@@ -170,7 +170,7 @@ add_shortcode('athle_calendar', function (array $atts): string {
                 <div class="cal-where"><?php echo esc_html($location); ?></div>
               <?php endif; ?>
             </div>
-          </div>
+          </a>
           <?php endforeach; wp_reset_postdata(); ?>
         </div>
       <?php endif; ?>

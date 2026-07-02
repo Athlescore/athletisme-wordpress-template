@@ -255,6 +255,8 @@ h1, h2, h3 {
   margin-top: 2rem;
 }
 .cal-card {
+  display: block;
+  color: inherit;
   background: var(--chalk);
   border-radius: 12px;
   border: 1.5px solid var(--line);
