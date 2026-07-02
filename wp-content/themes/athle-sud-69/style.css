@@ -192,6 +192,7 @@ h1, h2, h3 {
 
 /* ── Sections ────────────────────────────────────────────── */
 .sec-block { padding-block: clamp(3.5rem, 7vw, 6rem); }
+.sec-block--sm { padding-block: clamp(1.5rem, 3vw, 2.5rem); }
 .sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 1.5rem; margin-bottom: 2.6rem; flex-wrap: wrap; }
 .sec-head h2 { font-size: clamp(2.1rem, 5.5vw, 3.6rem); }
 .sec-head .link { font-weight: 600; color: var(--track); font-size: .95rem; white-space: nowrap; }

@@ -11,48 +11,88 @@ $type_labels = [
     'meeting'     => 'Réunion',
     'other'       => 'Autre',
 ];
-?>
-<div class="wrap">
 
-  <div class="page-hero">
-    <span class="eyebrow">Calendrier</span>
-    <h1 class="hero-title">Agenda</h1>
-    <p class="hero-sub">Compétitions et événements à venir</p>
-  </div>
+$base_args = [
+    'post_type'      => 'athle_event',
+    'posts_per_page' => -1,
+    'meta_key'       => '_event_date',
+    'orderby'        => 'meta_value',
+    'post_status'    => 'publish',
+];
 
-  <?php if (have_posts()): ?>
-    <div class="calendar-grid sec-block">
-      <?php while (have_posts()): the_post();
+$today    = date('Y-m-d');
+$upcoming = new WP_Query(array_merge($base_args, [
+    'order'      => 'ASC',
+    'meta_query' => [['key' => '_event_date', 'value' => $today, 'compare' => '>=', 'type' => 'DATE']],
+]));
+$past = new WP_Query(array_merge($base_args, [
+    'order'          => 'DESC',
+    'posts_per_page' => 24,
+    'meta_query'     => [['key' => '_event_date', 'value' => $today, 'compare' => '<', 'type' => 'DATE']],
+]));
+
+function athle_render_event_cards(WP_Query $query, array $mois, array $type_labels): void {
+    if (!$query->have_posts()):
+        echo '<p style="color:var(--steel);font-size:1.05rem;padding:.5rem 0">Aucun événement.</p>';
+        return;
+    endif;
+    echo '<div class="calendar-grid">';
+    while ($query->have_posts()): $query->the_post();
         $date     = get_post_meta(get_the_ID(), '_event_date', true);
         $location = get_post_meta(get_the_ID(), '_event_location', true);
         $type     = get_post_meta(get_the_ID(), '_event_type', true) ?: 'other';
         $ts       = $date ? strtotime($date) : null;
         $label    = $type_labels[$type] ?? 'Autre';
-      ?>
-      <a href="<?php the_permalink(); ?>" class="cal-card cal-type--<?php echo esc_attr($type); ?>">
-        <div class="cal-banner"><?php echo esc_html($label); ?></div>
-        <div class="cal-body">
-          <div class="cal-date">
-            <span class="cal-day"><?php echo $ts ? date('d', $ts) : '—'; ?></span>
-            <span class="cal-month"><?php echo $ts ? $mois[(int)date('n', $ts) - 1] : ''; ?></span>
-          </div>
-          <h2 class="cal-title"><?php the_title(); ?></h2>
-          <?php if ($location): ?>
-            <div class="cal-where"><?php echo esc_html($location); ?></div>
-          <?php endif; ?>
-        </div>
-      </a>
-      <?php endwhile; ?>
-    </div>
+        printf(
+            '<a href="%s" class="cal-card cal-type--%s">
+               <div class="cal-banner">%s</div>
+               <div class="cal-body">
+                 <div class="cal-date">
+                   <span class="cal-day">%s</span>
+                   <span class="cal-month">%s</span>
+                 </div>
+                 <h2 class="cal-title">%s</h2>
+                 %s
+               </div>
+             </a>',
+            esc_url(get_permalink()),
+            esc_attr($type),
+            esc_html($label),
+            $ts ? date('d', $ts) : '—',
+            $ts ? $mois[(int)date('n', $ts) - 1] : '',
+            esc_html(get_the_title()),
+            $location ? '<div class="cal-where">' . esc_html($location) . '</div>' : ''
+        );
+    endwhile;
+    echo '</div>';
+    wp_reset_postdata();
+}
+?>
 
-    <div class="pagination sec-block" style="text-align:center">
-      <?php the_posts_pagination(['mid_size' => 2]); ?>
-    </div>
+<div class="wrap">
+  <div class="page-hero">
+    <span class="eyebrow">Calendrier</span>
+    <h1 class="hero-title">Agenda</h1>
+  </div>
 
-  <?php else: ?>
-    <p class="sec-block" style="color:var(--steel);font-size:1.05rem">
-      Aucun événement à venir pour le moment.
-    </p>
+  <div class="sec-block sec-block--sm">
+    <div class="sec-head" style="margin-bottom:1.5rem">
+      <div>
+        <span class="eyebrow">À venir</span>
+      </div>
+    </div>
+    <?php athle_render_event_cards($upcoming, $mois, $type_labels); ?>
+  </div>
+
+  <?php if ($past->have_posts()): ?>
+  <div class="sec-block sec-block--sm">
+    <div class="sec-head" style="margin-bottom:1.5rem">
+      <div>
+        <span class="eyebrow">Événements passés</span>
+      </div>
+    </div>
+    <?php athle_render_event_cards($past, $mois, $type_labels); ?>
+  </div>
   <?php endif; ?>
 
 </div>
