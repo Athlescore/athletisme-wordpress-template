@@ -103,6 +103,46 @@ function athle_record_meta_cb(WP_Post $post): void
     }
 }
 
+// ── Colonnes admin — Événements ─────────────────────────────────────────────
+
+add_filter('manage_athle_event_posts_columns', function (array $cols): array {
+    unset($cols['date']);
+    return array_merge($cols, [
+        'event_date'     => 'Date',
+        'event_location' => 'Lieu',
+        'event_type'     => 'Type',
+    ]);
+});
+
+add_action('manage_athle_event_posts_custom_column', function (string $col, int $post_id): void {
+    $types = [
+        'competition' => 'Compétition',
+        'club'        => 'Événement club',
+        'training'    => 'Entraînement',
+        'meeting'     => 'Réunion',
+        'other'       => 'Autre',
+    ];
+    match ($col) {
+        'event_date'     => print(esc_html(get_post_meta($post_id, '_event_date', true) ?: '—')),
+        'event_location' => print(esc_html(get_post_meta($post_id, '_event_location', true) ?: '—')),
+        'event_type'     => print(esc_html($types[get_post_meta($post_id, '_event_type', true)] ?? '—')),
+        default          => null,
+    };
+}, 10, 2);
+
+add_filter('manage_edit-athle_event_sortable_columns', function (array $cols): array {
+    $cols['event_date'] = 'event_date';
+    return $cols;
+});
+
+add_action('pre_get_posts', function (WP_Query $q): void {
+    if (!is_admin() || $q->get('post_type') !== 'athle_event' || !$q->is_main_query()) return;
+    if ($q->get('orderby') === 'event_date') {
+        $q->set('meta_key', '_event_date');
+        $q->set('orderby', 'meta_value');
+    }
+});
+
 // ── Sauvegarde des meta ──────────────────────────────────────────────────────
 
 add_action('save_post_athle_event', function (int $post_id): void {
