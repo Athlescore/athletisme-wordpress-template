@@ -128,61 +128,65 @@ function athle_result_meta_cb(WP_Post $post): void
 
 function athle_result_rows_meta_cb(WP_Post $post): void
 {
-    $rows = json_decode(get_post_meta($post->ID, '_result_rows', true) ?: '[]', true);
-    if (empty($rows)) $rows = [['athlete' => '', 'disc' => '', 'perf' => '', 'place' => '']];
+    $stored = get_post_meta($post->ID, '_result_rows', true) ?: '[]';
     wp_nonce_field('athle_result_rows', 'athle_result_rows_nonce');
     $th = 'style="text-align:left;padding:.35rem .4rem;font-size:.78rem;color:#666;font-weight:600;white-space:nowrap"';
-    $td = 'style="padding:.2rem .3rem"';
-    $inp = 'style="width:100%;padding:.3rem .4rem;border:1px solid #ddd;border-radius:4px;font-size:.88rem"';
-    echo '<table style="width:100%;border-collapse:collapse;margin-bottom:.6rem">';
-    echo "<thead><tr><th {$th}>Athlète</th><th {$th}>Discipline</th><th {$th}>Performance</th><th {$th}>Place</th><th></th></tr></thead>";
-    echo '<tbody id="result-rows-body">';
-    foreach ($rows as $i => $row) {
-        $a = esc_attr($row['athlete'] ?? '');
-        $d = esc_attr($row['disc']    ?? '');
-        $p = esc_attr($row['perf']    ?? '');
-        $l = esc_attr($row['place']   ?? '');
-        echo "<tr class='rr'><td {$td}><input {$inp} type='text' name='result_rows[{$i}][athlete]' value='{$a}' placeholder='Nom Prénom'></td>"
-           . "<td {$td}><input {$inp} type='text' name='result_rows[{$i}][disc]' value='{$d}' placeholder='100m'></td>"
-           . "<td {$td}><input {$inp} type='text' name='result_rows[{$i}][perf]' value='{$p}' placeholder='10&quot;85'></td>"
-           . "<td {$td} style='width:3.5rem'><input {$inp} type='text' name='result_rows[{$i}][place]' value='{$l}' placeholder='1'></td>"
-           . "<td {$td} style='width:1.5rem'><button type='button' class='rr-del button-link' style='color:#a00;font-size:1rem;line-height:1' title='Supprimer'>✕</button></td></tr>";
-    }
-    echo '</tbody></table>';
-    echo '<button type="button" id="rr-add" class="button">+ Ajouter un athlète</button>';
     ?>
+    <input type="hidden" name="result_rows_json" id="rr-json" value="<?php echo esc_attr($stored); ?>">
+    <table style="width:100%;border-collapse:collapse;margin-bottom:.6rem">
+      <thead><tr>
+        <th <?php echo $th; ?>>Athlète</th>
+        <th <?php echo $th; ?>>Discipline</th>
+        <th <?php echo $th; ?>>Performance</th>
+        <th <?php echo $th; ?>>Place</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="rr-body"></tbody>
+    </table>
+    <button type="button" id="rr-add" class="button">+ Ajouter un athlète</button>
     <script>
     (function () {
-        var tbody = document.getElementById('result-rows-body');
-        var inp   = 'style="width:100%;padding:.3rem .4rem;border:1px solid #ddd;border-radius:4px;font-size:.88rem"';
+        var stored = <?php echo $stored; ?>;
+        var tbody  = document.getElementById('rr-body');
+        var hidden = document.getElementById('rr-json');
+        var s = 'style="width:100%;padding:.3rem .4rem;border:1px solid #ddd;border-radius:4px;font-size:.88rem"';
+        var p = 'style="padding:.2rem .3rem"';
 
-        function reindex() {
-            tbody.querySelectorAll('tr.rr').forEach(function (tr, i) {
-                tr.querySelectorAll('input').forEach(function (el) {
-                    el.name = el.name.replace(/\[\d+\]/, '[' + i + ']');
-                });
+        function esc(v) {
+            return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+        function sync() {
+            var rows = [];
+            tbody.querySelectorAll('tr').forEach(function (tr) {
+                var inp = tr.querySelectorAll('input[type=text]');
+                rows.push({ athlete: inp[0].value, disc: inp[1].value, perf: inp[2].value, place: inp[3].value });
             });
+            hidden.value = JSON.stringify(rows);
+        }
+        function makeRow(d) {
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td ' + p + '><input ' + s + ' type="text" placeholder="Nom Prénom" value="' + esc(d.athlete||'') + '"></td>' +
+                '<td ' + p + '><input ' + s + ' type="text" placeholder="100m" value="' + esc(d.disc||'') + '"></td>' +
+                '<td ' + p + '><input ' + s + ' type="text" placeholder="10\'85" value="' + esc(d.perf||'') + '"></td>' +
+                '<td ' + p + ' style="width:3.5rem"><input ' + s + ' type="text" placeholder="1" value="' + esc(d.place||'') + '"></td>' +
+                '<td ' + p + ' style="width:1.5rem"><button type="button" class="rr-del button-link" style="color:#a00;font-size:1rem;line-height:1" title="Supprimer">✕</button></td>';
+            return tr;
         }
 
+        (stored.length ? stored : [{}]).forEach(function (r) { tbody.appendChild(makeRow(r)); });
+        sync();
+
         document.getElementById('rr-add').addEventListener('click', function () {
-            var i  = tbody.querySelectorAll('tr.rr').length;
-            var tr = document.createElement('tr');
-            tr.className = 'rr';
-            tr.innerHTML = "<td style='padding:.2rem .3rem'><input " + inp + " type='text' name='result_rows[" + i + "][athlete]' placeholder='Nom Prénom'></td>"
-                + "<td style='padding:.2rem .3rem'><input " + inp + " type='text' name='result_rows[" + i + "][disc]' placeholder='100m'></td>"
-                + "<td style='padding:.2rem .3rem'><input " + inp + " type='text' name='result_rows[" + i + "][perf]' placeholder='10\"85'></td>"
-                + "<td style='padding:.2rem .3rem;width:3.5rem'><input " + inp + " type='text' name='result_rows[" + i + "][place]' placeholder='1'></td>"
-                + "<td style='padding:.2rem .3rem;width:1.5rem'><button type='button' class='rr-del button-link' style='color:#a00;font-size:1rem;line-height:1' title='Supprimer'>✕</button></td>";
+            var tr = makeRow({});
             tbody.appendChild(tr);
             tr.querySelector('input').focus();
+            sync();
         });
-
         tbody.addEventListener('click', function (e) {
-            if (e.target.classList.contains('rr-del')) {
-                e.target.closest('tr').remove();
-                reindex();
-            }
+            if (e.target.classList.contains('rr-del')) { e.target.closest('tr').remove(); sync(); }
         });
+        tbody.addEventListener('input', sync);
     })();
     </script>
     <?php
@@ -278,8 +282,9 @@ add_action('save_post_athle_result', function (int $post_id): void {
     }
 
     if (isset($_POST['athle_result_rows_nonce']) && wp_verify_nonce($_POST['athle_result_rows_nonce'], 'athle_result_rows')) {
+        $raw  = json_decode(wp_unslash($_POST['result_rows_json'] ?? '[]'), true);
         $rows = [];
-        foreach ((array) ($_POST['result_rows'] ?? []) as $row) {
+        foreach ((array) $raw as $row) {
             $athlete = sanitize_text_field($row['athlete'] ?? '');
             if ($athlete === '') continue;
             $rows[] = [
