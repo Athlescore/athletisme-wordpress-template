@@ -283,6 +283,86 @@ h1, h2, h3 {
 .cal-type--training    .cal-banner { background: var(--steel); }
 .cal-type--meeting     .cal-banner { background: #7C3AED; }
 .cal-type--result      .cal-banner { background: #059669; }
+
+/* ── Cards résultats ──────────────────────────────────────────────────────── */
+.res-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.1rem;
+  margin-top: 2rem;
+}
+.res-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--chalk);
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  color: inherit;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.res-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0,0,0,.08);
+  text-decoration: none;
+}
+.res-card-head {
+  padding: .85rem 1rem .7rem;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .25rem .6rem;
+}
+.res-card-date {
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--track);
+  letter-spacing: .02em;
+}
+.res-card-loc {
+  font-size: .78rem;
+  color: var(--steel);
+  margin-left: auto;
+}
+.res-card-title {
+  width: 100%;
+  font-size: .9rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--ink);
+  margin: .25rem 0 0;
+  line-height: 1.25;
+}
+.res-rows {
+  flex: 1;
+  padding: .4rem 0;
+}
+.res-row {
+  display: flex;
+  flex-direction: column;
+  gap: .1rem;
+  padding: .45rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.res-row:last-child { border-bottom: none; }
+.res-athlete {
+  font-size: .88rem;
+  color: var(--ink);
+}
+.res-detail {
+  font-size: .78rem;
+  color: var(--steel);
+}
+.res-detail strong { color: var(--ink); }
+.res-card-more {
+  padding: .6rem 1rem;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--track);
+  border-top: 1px solid var(--line);
+}
 .cal-body { padding: .9rem 1rem 1.1rem; }
 .cal-date { display: flex; align-items: baseline; gap: .35rem; margin-bottom: .55rem; }
 .cal-day {

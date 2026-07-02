@@ -181,17 +181,30 @@ add_shortcode('athle_calendar', function (array $atts): string {
 
 // ── [athle_results count="4"] ─────────────────────────────────────────────────
 
-add_shortcode('athle_results', function (array $atts): string {
-    $a = shortcode_atts(['count' => 4, 'title' => 'Derniers résultats', 'eyebrow' => 'En compétition'], $atts);
+function athle_parse_result_rows(string $content, int $max = 6): array
+{
+    if (empty(trim($content))) return [];
+    $dom = new DOMDocument();
+    @$dom->loadHTML('<?xml encoding="utf-8" ?>' . $content, LIBXML_NOERROR);
+    $rows = [];
+    $trs  = $dom->getElementsByTagName('tr');
+    foreach ($trs as $i => $tr) {
+        if ($i === 0) continue; // ignore le header
+        $cells = $tr->getElementsByTagName('td');
+        if ($cells->length < 2) continue;
+        $rows[] = [
+            'athlete' => trim($cells->item(0)->textContent),
+            'disc'    => trim($cells->item(1)->textContent),
+            'perf'    => $cells->length >= 3 ? trim($cells->item(2)->textContent) : '',
+            'place'   => $cells->length >= 4 ? trim($cells->item(3)->textContent) : '',
+        ];
+        if (count($rows) >= $max) break;
+    }
+    return $rows;
+}
 
-    $mois = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
-    $cats = [
-        'poussin' => 'Poussin', 'pupille' => 'Pupille',
-        'benjam'  => 'Benjamin','minime'  => 'Minime',
-        'cadet'   => 'Cadet',  'junior'  => 'Junior',
-        'espoir'  => 'Espoir', 'senior'  => 'Senior',
-        'master'  => 'Master', 'mixte'   => 'Toutes catégories',
-    ];
+add_shortcode('athle_results', function (array $atts): string {
+    $a = shortcode_atts(['count' => 4, 'title' => 'Derniers résultats', 'eyebrow' => 'En compétition', 'rows' => 5], $atts);
 
     $results = get_posts([
         'post_type'   => 'athle_result',
@@ -215,26 +228,37 @@ add_shortcode('athle_results', function (array $atts): string {
       <?php if (empty($results)): ?>
         <p style="color:var(--steel);font-size:1.05rem">Aucun résultat disponible pour le moment.</p>
       <?php else: ?>
-        <div class="calendar-grid">
+        <div class="res-grid">
           <?php foreach ($results as $res):
             $date     = get_post_meta($res->ID, '_result_date', true);
             $location = get_post_meta($res->ID, '_result_location', true);
-            $cat      = get_post_meta($res->ID, '_result_category', true);
             $ts       = $date ? strtotime($date) : null;
-            $cat_lbl  = $cats[$cat] ?? 'Résultats';
+            $rows     = athle_parse_result_rows($res->post_content, (int) $a['rows']);
           ?>
-          <a href="<?php echo esc_url(get_permalink($res->ID)); ?>" class="cal-card cal-type--result reveal">
-            <div class="cal-banner"><?php echo esc_html($cat_lbl); ?></div>
-            <div class="cal-body">
-              <div class="cal-date">
-                <span class="cal-day"><?php echo $ts ? date('d', $ts) : '—'; ?></span>
-                <span class="cal-month"><?php echo $ts ? $mois[(int)date('n', $ts) - 1] : ''; ?></span>
-              </div>
-              <h3 class="cal-title"><?php echo esc_html($res->post_title); ?></h3>
-              <?php if ($location): ?>
-                <div class="cal-where"><?php echo esc_html($location); ?></div>
+          <a href="<?php echo esc_url(get_permalink($res->ID)); ?>" class="res-card reveal">
+            <div class="res-card-head">
+              <?php if ($ts): ?>
+                <span class="res-card-date"><?php echo date('d/m/Y', $ts); ?></span>
               <?php endif; ?>
+              <?php if ($location): ?>
+                <span class="res-card-loc"><?php echo esc_html($location); ?></span>
+              <?php endif; ?>
+              <h3 class="res-card-title"><?php echo esc_html($res->post_title); ?></h3>
             </div>
+            <?php if (!empty($rows)): ?>
+            <div class="res-rows">
+              <?php foreach ($rows as $row): ?>
+              <div class="res-row">
+                <strong class="res-athlete"><?php echo esc_html($row['athlete']); ?></strong>
+                <span class="res-detail">
+                  <?php echo esc_html($row['disc']); ?>
+                  <?php if ($row['perf']): ?> — <strong><?php echo esc_html($row['perf']); ?></strong><?php endif; ?>
+                </span>
+              </div>
+              <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+            <div class="res-card-more">Voir le détail →</div>
           </a>
           <?php endforeach; ?>
         </div>
