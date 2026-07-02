@@ -235,6 +235,25 @@ function athle_customizer(\WP_Customize_Manager $wp_customize): void
     $wp_customize->add_setting('hero_cta2_hidden', ['default' => '0', 'sanitize_callback' => 'absint']);
     $wp_customize->add_control('hero_cta2_hidden', ['label' => 'Masquer le bouton 2', 'section' => 'athle_hero_cta', 'type' => 'checkbox']);
 
+    // ── Couleurs ─────────────────────────────────────────────────────────────
+    $wp_customize->add_section('athle_colors', ['title' => 'Couleurs du thème', 'priority' => 25]);
+
+    foreach ([
+        ['color_primary', 'Couleur principale (boutons, accents)', '#F0560A'],
+        ['color_ink',     'Couleur foncée (textes, hero, footer)', '#08192F'],
+        ['color_paper',   'Couleur de fond',                       '#F4F4F2'],
+    ] as [$id, $label, $default]) {
+        $wp_customize->add_setting($id, [
+            'default'           => $default,
+            'sanitize_callback' => 'sanitize_hex_color',
+            'transport'         => 'refresh',
+        ]);
+        $wp_customize->add_control(new \WP_Customize_Color_Control($wp_customize, $id, [
+            'label'   => $label,
+            'section' => 'athle_colors',
+        ]));
+    }
+
     // ── Contact / footer ─────────────────────────────────────────────────────
     $wp_customize->add_section('athle_contact', ['title' => 'Contact & Footer', 'priority' => 40]);
     foreach ([
@@ -261,6 +280,25 @@ function athle_customizer(\WP_Customize_Manager $wp_customize): void
     ]);
 }
 add_action('customize_register', 'athle_customizer');
+
+// Injecter les couleurs personnalisées en CSS variables
+function athle_inline_colors(): void
+{
+    $primary = get_theme_mod('color_primary', '#F0560A');
+    $ink     = get_theme_mod('color_ink',     '#08192F');
+    $paper   = get_theme_mod('color_paper',   '#F4F4F2');
+
+    // Ne rien injecter si toutes les valeurs sont les valeurs par défaut
+    if ($primary === '#F0560A' && $ink === '#08192F' && $paper === '#F4F4F2') return;
+
+    printf(
+        "<style>:root{--track:%s;--volt:%s;--track-deep:color-mix(in srgb,%s 80%%,black);--ink:%s;--ink-soft:color-mix(in srgb,%s 85%%,white);--paper:%s}</style>\n",
+        esc_attr($primary), esc_attr($primary), esc_attr($primary),
+        esc_attr($ink), esc_attr($ink),
+        esc_attr($paper)
+    );
+}
+add_action('wp_head', 'athle_inline_colors', 20);
 
 // ── Block pattern — page d'accueil ───────────────────────────────────────────
 
