@@ -301,6 +301,12 @@ add_action('save_post_athle_record', function (int $post_id): void {
     }
 });
 
+// ── Éditeur classique pour les résultats (méta boxes dans la sidebar) ────────
+
+add_filter('use_block_editor_for_post_type', function (bool $use, string $post_type): bool {
+    return $post_type === 'athle_result' ? false : $use;
+}, 10, 2);
+
 // ── Géocodage Nominatim ──────────────────────────────────────────────────────
 
 function athle_geocode_location(string $address): ?array
