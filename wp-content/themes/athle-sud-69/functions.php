@@ -123,7 +123,7 @@ function athle_event_meta_cb(\WP_Post $post): void
     echo '<p><label><strong>Date</strong><br><input type="date" name="event_date" value="' . esc_attr($date) . '" style="width:100%;margin-top:.3rem"></label></p>';
     echo '<p><label><strong>Lieu</strong><br><input type="text" name="event_location" value="' . esc_attr($location) . '" style="width:100%;margin-top:.3rem"></label></p>';
     echo '<p><label><strong>Type</strong><br><select name="event_type" style="width:100%;margin-top:.3rem">';
-    foreach (['competition' => 'Compétition', 'training' => 'Entraînement', 'meeting' => 'Réunion', 'other' => 'Autre'] as $val => $lbl) {
+    foreach (['competition' => 'Compétition', 'club' => 'Événement club', 'training' => 'Entraînement', 'meeting' => 'Réunion', 'other' => 'Autre'] as $val => $lbl) {
         echo '<option value="' . esc_attr($val) . '"' . selected($type, $val, false) . '>' . esc_html($lbl) . '</option>';
     }
     echo '</select></label></p>';

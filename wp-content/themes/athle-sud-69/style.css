@@ -247,6 +247,78 @@ h1, h2, h3 {
 .hero-title { font-family: var(--display); font-size: clamp(2rem, 5vw, 3rem); font-weight: 900; text-transform: uppercase; line-height: 1.05; margin: 0 0 .5rem; }
 .hero-sub { color: var(--steel); font-size: 1.05rem; margin: 0; }
 
+/* ── Calendrier — grille de cartes ──────────────────────── */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.1rem;
+  margin-top: 2rem;
+}
+.cal-card {
+  background: var(--chalk);
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  overflow: hidden;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.cal-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 28px rgba(8,25,47,.1);
+}
+.cal-banner {
+  padding: .4rem .85rem;
+  font-family: var(--body);
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--chalk);
+  background: var(--steel);
+}
+.cal-type--competition .cal-banner { background: var(--track); }
+.cal-type--club        .cal-banner { background: var(--ink); }
+.cal-type--training    .cal-banner { background: var(--steel); }
+.cal-type--meeting     .cal-banner { background: #7C3AED; }
+.cal-body { padding: .9rem 1rem 1.1rem; }
+.cal-date { display: flex; align-items: baseline; gap: .35rem; margin-bottom: .55rem; }
+.cal-day {
+  font-family: var(--display);
+  font-size: 2.6rem;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--ink);
+}
+.cal-month {
+  font-family: var(--body);
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--steel);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+.cal-title {
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.15;
+  margin-bottom: .4rem;
+  color: var(--ink);
+}
+.cal-where {
+  font-size: .82rem;
+  color: var(--steel);
+  padding-left: 1rem;
+  position: relative;
+}
+.cal-where::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--track);
+}
+
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 920px) {
   .news-grid { grid-template-columns: 1fr 1fr; }
