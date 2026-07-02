@@ -16,6 +16,19 @@ function athle_setup(): void
     ]);
 
     load_theme_textdomain('athle-sud-69', get_template_directory() . '/languages');
+
+    // Palette de couleurs pour l'éditeur Gutenberg — lit les couleurs du customizer
+    $primary = get_theme_mod('color_primary', '#F0560A');
+    $ink     = get_theme_mod('color_ink',     '#08192F');
+    $paper   = get_theme_mod('color_paper',   '#F4F4F2');
+
+    add_theme_support('editor-color-palette', [
+        ['name' => 'Principale',  'slug' => 'primary', 'color' => $primary],
+        ['name' => 'Foncée',      'slug' => 'ink',     'color' => $ink],
+        ['name' => 'Fond',        'slug' => 'paper',   'color' => $paper],
+        ['name' => 'Blanc',       'slug' => 'chalk',   'color' => '#ffffff'],
+        ['name' => 'Gris',        'slug' => 'steel',   'color' => '#6B7280'],
+    ]);
 }
 add_action('after_setup_theme', 'athle_setup');
 
@@ -299,6 +312,30 @@ function athle_inline_colors(): void
     );
 }
 add_action('wp_head', 'athle_inline_colors', 20);
+
+// CSS des classes de couleurs Gutenberg (has-primary-background-color, etc.)
+function athle_palette_css(): void
+{
+    $primary = get_theme_mod('color_primary', '#F0560A');
+    $ink     = get_theme_mod('color_ink',     '#08192F');
+    $paper   = get_theme_mod('color_paper',   '#F4F4F2');
+
+    $css = sprintf('
+        .has-primary-color{color:%1$s!important}
+        .has-primary-background-color{background-color:%1$s!important}
+        .has-ink-color{color:%2$s!important}
+        .has-ink-background-color{background-color:%2$s!important}
+        .has-paper-color{color:%3$s!important}
+        .has-paper-background-color{background-color:%3$s!important}
+        .wp-block-button .wp-block-button__link.has-primary-background-color{background-color:%1$s;border-color:%1$s;color:#fff}
+        .wp-block-button .wp-block-button__link.has-ink-background-color{background-color:%2$s;border-color:%2$s;color:#fff}
+        .wp-block-button.is-style-outline .wp-block-button__link.has-primary-color{border-color:%1$s;color:%1$s}
+        .wp-block-button.is-style-outline .wp-block-button__link.has-ink-color{border-color:%2$s;color:%2$s}
+    ', esc_attr($primary), esc_attr($ink), esc_attr($paper));
+
+    echo '<style>' . $css . '</style>' . "\n";
+}
+add_action('wp_head', 'athle_palette_css', 21);
 
 // ── Block pattern — page d'accueil ───────────────────────────────────────────
 
