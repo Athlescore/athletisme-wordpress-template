@@ -372,11 +372,18 @@ function athle_check_theme_update(object $transient): object
     $latest = ltrim($data['tag_name'], 'v');
 
     if (version_compare($latest, $current, '>')) {
+        $package = '';
+        foreach ($data['assets'] ?? [] as $asset) {
+            if (str_ends_with($asset['name'], '.zip')) {
+                $package = $asset['browser_download_url'];
+                break;
+            }
+        }
         $transient->response[$slug] = [
             'theme'       => $slug,
             'new_version' => $latest,
             'url'         => 'https://github.com/Athlescore/athletisme-wordpress-template',
-            'package'     => $data['zipball_url'] ?? '',
+            'package'     => $package,
         ];
     }
 
