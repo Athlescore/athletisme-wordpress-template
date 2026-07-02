@@ -128,11 +128,22 @@ function athle_result_meta_cb(WP_Post $post): void
 
 function athle_result_rows_meta_cb(WP_Post $post): void
 {
-    $stored = get_post_meta($post->ID, '_result_rows', true) ?: '[]';
+    $raw = get_post_meta($post->ID, '_result_rows', true);
+    // Compatibilité : ancien format JSON string ou nouveau format tableau PHP
+    if (is_array($raw)) {
+        $stored_array = $raw;
+    } elseif ($raw) {
+        $stored_array = json_decode($raw, true) ?: [];
+    } else {
+        $stored_array = [];
+    }
+    $stored_json = wp_json_encode($stored_array);
+
     wp_nonce_field('athle_result_rows', 'athle_result_rows_nonce');
     $th = 'style="text-align:left;padding:.35rem .4rem;font-size:.78rem;color:#666;font-weight:600;white-space:nowrap"';
     ?>
-    <input type="hidden" name="result_rows_json" id="rr-json" value="<?php echo esc_attr($stored); ?>">
+    <input type="hidden" name="result_rows_json" id="rr-json" value="">
+    <div id="rr-data" data-rows="<?php echo esc_attr($stored_json); ?>" hidden></div>
     <table style="width:100%;border-collapse:collapse;margin-bottom:.6rem">
       <thead><tr>
         <th <?php echo $th; ?>>Athlète</th>
@@ -146,7 +157,7 @@ function athle_result_rows_meta_cb(WP_Post $post): void
     <button type="button" id="rr-add" class="button">+ Ajouter un athlète</button>
     <script>
     (function () {
-        var stored = <?php echo $stored; ?>;
+        var stored = JSON.parse(document.getElementById('rr-data').getAttribute('data-rows') || '[]');
         var tbody  = document.getElementById('rr-body');
         var hidden = document.getElementById('rr-json');
         var s = 'style="width:100%;padding:.3rem .4rem;border:1px solid #ddd;border-radius:4px;font-size:.88rem"';
@@ -176,6 +187,10 @@ function athle_result_rows_meta_cb(WP_Post $post): void
 
         (stored.length ? stored : [{}]).forEach(function (r) { tbody.appendChild(makeRow(r)); });
         sync();
+
+        // Sync final au moment du submit (sécurité)
+        var form = document.getElementById('post');
+        if (form) form.addEventListener('submit', sync);
 
         document.getElementById('rr-add').addEventListener('click', function () {
             var tr = makeRow({});
@@ -294,7 +309,9 @@ add_action('save_post_athle_result', function (int $post_id): void {
                 'place'   => sanitize_text_field($row['place'] ?? ''),
             ];
         }
-        update_post_meta($post_id, '_result_rows', wp_json_encode($rows));
+        // Stocker en tant que tableau PHP (maybe_serialize) pour éviter que
+        // wp_unslash() interne à update_post_meta ne corrompe les backslashes du JSON.
+        update_post_meta($post_id, '_result_rows', $rows);
     }
 });
 

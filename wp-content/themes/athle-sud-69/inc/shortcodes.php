@@ -184,7 +184,8 @@ add_shortcode('athle_calendar', function (array $atts): string {
 function athle_parse_result_rows(int $post_id, int $max = 6): array
 {
     $stored = get_post_meta($post_id, '_result_rows', true);
-    $raw    = $stored ? json_decode($stored, true) : [];
+    // Support ancien format JSON string et nouveau format tableau PHP
+    $raw = is_array($stored) ? $stored : ($stored ? json_decode($stored, true) : []);
     $grouped = [];
     foreach ((array) $raw as $row) {
         $athlete = $row['athlete'] ?? '';

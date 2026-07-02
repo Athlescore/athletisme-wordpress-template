@@ -363,6 +363,33 @@ h1, h2, h3 {
   color: var(--track);
   border-top: 1px solid var(--line);
 }
+/* ── Page détail résultat ──────────────────────────────────────────────────── */
+.result-table-wrap {
+  overflow-x: auto;
+  margin: 1.5rem 0;
+}
+.result-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .95rem;
+}
+.result-table thead th {
+  text-align: left;
+  padding: .55rem .75rem;
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--steel);
+  border-bottom: 2px solid var(--line);
+  white-space: nowrap;
+}
+.result-table tbody td {
+  padding: .55rem .75rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.result-table tbody tr:last-child td { border-bottom: none; }
+.result-table tbody tr:hover { background: #f8f9fa; }
+
 .cal-body { padding: .9rem 1rem 1.1rem; }
 .cal-date { display: flex; align-items: baseline; gap: .35rem; margin-bottom: .55rem; }
 .cal-day {
