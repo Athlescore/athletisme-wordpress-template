@@ -66,12 +66,18 @@ function athle_event_meta_cb(WP_Post $post): void
 {
     $date     = get_post_meta($post->ID, '_event_date', true);
     $location = get_post_meta($post->ID, '_event_location', true);
-    $type     = get_post_meta($post->ID, '_event_type', true);
+    $lat      = get_post_meta($post->ID, '_event_lat', true);
+    // Pré-sélectionne le type depuis l'URL lors de la création
+    $type     = get_post_meta($post->ID, '_event_type', true)
+                ?: sanitize_key($_GET['event_type'] ?? '');
     wp_nonce_field('athle_event_meta', 'athle_event_nonce');
     echo '<p><label><strong>Date</strong><br>
           <input type="date" name="event_date" value="' . esc_attr($date) . '" style="width:100%;margin-top:.3rem"></label></p>';
-    echo '<p><label><strong>Lieu</strong><br>
-          <input type="text" name="event_location" value="' . esc_attr($location) . '" style="width:100%;margin-top:.3rem"></label></p>';
+    echo '<p><label><strong>Lieu</strong> <span style="color:#666;font-weight:400">(adresse complète — la carte se génère automatiquement à la sauvegarde)</span><br>
+          <textarea name="event_location" rows="3" style="width:100%;margin-top:.3rem" placeholder="ex: Stade de Feyzin&#10;Avenue des Sports&#10;69320 Feyzin">' . esc_textarea($location) . '</textarea></label></p>';
+    if ($lat) {
+        echo '<p style="color:#666;font-size:.85em">📍 Carte géocodée — modifier l\'adresse et sauvegarder pour mettre à jour.</p>';
+    }
     echo '<p><label><strong>Type</strong><br>
           <select name="event_type" style="width:100%;margin-top:.3rem">';
     foreach ([
@@ -148,8 +154,21 @@ add_action('pre_get_posts', function (WP_Query $q): void {
 add_action('save_post_athle_event', function (int $post_id): void {
     if (!isset($_POST['athle_event_nonce']) || !wp_verify_nonce($_POST['athle_event_nonce'], 'athle_event_meta')) return;
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
-    foreach (['event_date' => '_event_date', 'event_location' => '_event_location', 'event_type' => '_event_type'] as $field => $meta) {
+    foreach (['event_date' => '_event_date', 'event_type' => '_event_type'] as $field => $meta) {
         if (isset($_POST[$field])) update_post_meta($post_id, $meta, sanitize_text_field($_POST[$field]));
+    }
+    // Géocode l'adresse si elle a changé
+    if (isset($_POST['event_location'])) {
+        $new_loc = sanitize_text_field($_POST['event_location']);
+        $old_loc = get_post_meta($post_id, '_event_location', true);
+        update_post_meta($post_id, '_event_location', $new_loc);
+        if ($new_loc && $new_loc !== $old_loc) {
+            $coords = athle_geocode_location($new_loc);
+            if ($coords) {
+                update_post_meta($post_id, '_event_lat', $coords['lat']);
+                update_post_meta($post_id, '_event_lng', $coords['lng']);
+            }
+        }
     }
 });
 
@@ -158,5 +177,156 @@ add_action('save_post_athle_record', function (int $post_id): void {
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
     foreach (['record_discipline', 'record_athlete', 'record_mark', 'record_category', 'record_date'] as $field) {
         if (isset($_POST[$field])) update_post_meta($post_id, '_' . $field, sanitize_text_field($_POST[$field]));
+    }
+});
+
+// ── Géocodage Nominatim ──────────────────────────────────────────────────────
+
+function athle_geocode_location(string $address): ?array
+{
+    $url      = 'https://nominatim.openstreetmap.org/search?' . http_build_query([
+        'q'      => $address,
+        'format' => 'json',
+        'limit'  => 1,
+    ]);
+    $response = wp_remote_get($url, [
+        'headers' => ['User-Agent' => 'AthlesSud69/1.0'],
+        'timeout' => 5,
+    ]);
+    if (is_wp_error($response)) return null;
+    $data = json_decode(wp_remote_retrieve_body($response), true);
+    if (empty($data[0])) return null;
+    return ['lat' => (float) $data[0]['lat'], 'lng' => (float) $data[0]['lon']];
+}
+
+// ── Carte Leaflet [athle_map] ────────────────────────────────────────────────
+
+$GLOBALS['athle_maps'] = [];
+
+add_shortcode('athle_map', function (): string {
+    global $post;
+    $id  = $post->ID ?? 0;
+    $lat = (float) get_post_meta($id, '_event_lat', true);
+    $lng = (float) get_post_meta($id, '_event_lng', true);
+    $loc = get_post_meta($id, '_event_location', true) ?: get_the_title($id);
+
+    if (!$lat || !$lng) {
+        return '<p style="color:#888;font-size:.9rem;border:1px dashed #ccc;padding:.6rem .9rem;border-radius:6px">'
+             . '📍 Carte disponible après renseignement et sauvegarde de l\'adresse.</p>';
+    }
+
+    $map_id = 'athle-map-' . $id;
+    $GLOBALS['athle_maps'][$map_id] = ['lat' => $lat, 'lng' => $lng, 'popup' => $loc];
+
+    wp_enqueue_style('leaflet',  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css', [], '1.9.4');
+    wp_enqueue_script('leaflet', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',  [], '1.9.4', true);
+
+    static $footer_hooked = false;
+    if (!$footer_hooked) {
+        add_action('wp_footer', function (): void {
+            if (empty($GLOBALS['athle_maps'])) return;
+            $cfg = wp_json_encode($GLOBALS['athle_maps']);
+            echo "<script>
+window.addEventListener('load',function(){
+  var maps={$cfg};
+  Object.entries(maps).forEach(function(e){
+    var id=e[0],c=e[1];
+    if(!document.getElementById(id))return;
+    var m=L.map(id).setView([c.lat,c.lng],15);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(m);
+    L.marker([c.lat,c.lng]).addTo(m).bindPopup(c.popup).openPopup();
+  });
+});
+</script>";
+        }, 20);
+        $footer_hooked = true;
+    }
+
+    return '<div id="' . esc_attr($map_id) . '" style="height:320px;border-radius:10px;margin:1rem 0"></div>';
+});
+
+// ── Templates de blocs par type d'événement ──────────────────────────────────
+
+function athle_event_template(string $type): string
+{
+    $map   = "<!-- wp:shortcode -->\n[athle_map]\n<!-- /wp:shortcode -->";
+    $infos = <<<BLOCKS
+<!-- wp:heading {"level":3} -->
+<h3>Informations pratiques</h3>
+<!-- /wp:heading -->
+<!-- wp:list -->
+<ul class="wp-block-list"><li>Tarif : </li><li>Contact : </li></ul>
+<!-- /wp:list -->
+<!-- wp:heading {"level":3} -->
+<h3>Lieu</h3>
+<!-- /wp:heading -->
+{$map}
+BLOCKS;
+
+    return match ($type) {
+        'competition' => <<<BLOCKS
+<!-- wp:paragraph -->
+<p>Décrivez la compétition et les épreuves proposées.</p>
+<!-- /wp:paragraph -->
+<!-- wp:heading {"level":3} -->
+<h3>Programme</h3>
+<!-- /wp:heading -->
+<!-- wp:paragraph -->
+<p>Horaires et ordre des épreuves...</p>
+<!-- /wp:paragraph -->
+{$infos}
+BLOCKS,
+        'club' => <<<BLOCKS
+<!-- wp:paragraph -->
+<p>Décrivez l'événement.</p>
+<!-- /wp:paragraph -->
+{$infos}
+BLOCKS,
+        'training' => <<<BLOCKS
+<!-- wp:paragraph -->
+<p>Informations sur la séance d'entraînement.</p>
+<!-- /wp:paragraph -->
+<!-- wp:heading {"level":3} -->
+<h3>Lieu</h3>
+<!-- /wp:heading -->
+{$map}
+BLOCKS,
+        'meeting' => <<<BLOCKS
+<!-- wp:paragraph -->
+<p>Ordre du jour :</p>
+<!-- /wp:paragraph -->
+<!-- wp:list -->
+<ul class="wp-block-list"><li></li><li></li><li></li></ul>
+<!-- /wp:list -->
+<!-- wp:heading {"level":3} -->
+<h3>Lieu</h3>
+<!-- /wp:heading -->
+{$map}
+BLOCKS,
+        default => "<!-- wp:paragraph -->\n<p></p>\n<!-- /wp:paragraph -->\n{$map}",
+    };
+}
+
+add_filter('default_content', function (string $content, WP_Post $post): string {
+    if ($post->post_type !== 'athle_event') return $content;
+    $type = sanitize_key($_GET['event_type'] ?? '');
+    return $type ? athle_event_template($type) : $content;
+}, 10, 2);
+
+// ── Liens rapides dans le menu admin ─────────────────────────────────────────
+
+add_action('admin_menu', function (): void {
+    foreach ([
+        'competition' => '+ Compétition',
+        'club'        => '+ Événement club',
+        'training'    => '+ Entraînement',
+        'meeting'     => '+ Réunion',
+    ] as $type => $label) {
+        add_submenu_page(
+            'edit.php?post_type=athle_event',
+            $label, $label,
+            'edit_posts',
+            'post-new.php?post_type=athle_event&event_type=' . $type
+        );
     }
 });
