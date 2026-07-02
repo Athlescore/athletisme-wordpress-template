@@ -60,9 +60,10 @@ add_action('init', function (): void {
 // ── Meta boxes ───────────────────────────────────────────────────────────────
 
 add_action('add_meta_boxes', function (): void {
-    add_meta_box('athle_event_meta',  'Détails de l\'événement', 'athle_event_meta_cb',  'athle_event',  'normal');
-    add_meta_box('athle_result_meta', 'Détails du résultat',     'athle_result_meta_cb', 'athle_result', 'normal');
-    add_meta_box('athle_record_meta', 'Détails du record',       'athle_record_meta_cb', 'athle_record', 'normal');
+    add_meta_box('athle_event_meta',       'Détails de l\'événement', 'athle_event_meta_cb',       'athle_event',  'normal');
+    add_meta_box('athle_result_meta',      'Détails du résultat',     'athle_result_meta_cb',      'athle_result', 'normal');
+    add_meta_box('athle_result_rows_meta', 'Performances',            'athle_result_rows_meta_cb', 'athle_result', 'normal');
+    add_meta_box('athle_record_meta',      'Détails du record',       'athle_record_meta_cb',      'athle_record', 'normal');
 });
 
 function athle_event_meta_cb(WP_Post $post): void
@@ -123,6 +124,68 @@ function athle_result_meta_cb(WP_Post $post): void
         echo '<option value="' . esc_attr($val) . '"' . selected($category, $val, false) . '>' . esc_html($lbl) . '</option>';
     }
     echo '</select></label></p>';
+}
+
+function athle_result_rows_meta_cb(WP_Post $post): void
+{
+    $rows = json_decode(get_post_meta($post->ID, '_result_rows', true) ?: '[]', true);
+    if (empty($rows)) $rows = [['athlete' => '', 'disc' => '', 'perf' => '', 'place' => '']];
+    wp_nonce_field('athle_result_rows', 'athle_result_rows_nonce');
+    $th = 'style="text-align:left;padding:.35rem .4rem;font-size:.78rem;color:#666;font-weight:600;white-space:nowrap"';
+    $td = 'style="padding:.2rem .3rem"';
+    $inp = 'style="width:100%;padding:.3rem .4rem;border:1px solid #ddd;border-radius:4px;font-size:.88rem"';
+    echo '<table style="width:100%;border-collapse:collapse;margin-bottom:.6rem">';
+    echo "<thead><tr><th {$th}>Athlète</th><th {$th}>Discipline</th><th {$th}>Performance</th><th {$th}>Place</th><th></th></tr></thead>";
+    echo '<tbody id="result-rows-body">';
+    foreach ($rows as $i => $row) {
+        $a = esc_attr($row['athlete'] ?? '');
+        $d = esc_attr($row['disc']    ?? '');
+        $p = esc_attr($row['perf']    ?? '');
+        $l = esc_attr($row['place']   ?? '');
+        echo "<tr class='rr'><td {$td}><input {$inp} type='text' name='result_rows[{$i}][athlete]' value='{$a}' placeholder='Nom Prénom'></td>"
+           . "<td {$td}><input {$inp} type='text' name='result_rows[{$i}][disc]' value='{$d}' placeholder='100m'></td>"
+           . "<td {$td}><input {$inp} type='text' name='result_rows[{$i}][perf]' value='{$p}' placeholder='10&quot;85'></td>"
+           . "<td {$td} style='width:3.5rem'><input {$inp} type='text' name='result_rows[{$i}][place]' value='{$l}' placeholder='1'></td>"
+           . "<td {$td} style='width:1.5rem'><button type='button' class='rr-del button-link' style='color:#a00;font-size:1rem;line-height:1' title='Supprimer'>✕</button></td></tr>";
+    }
+    echo '</tbody></table>';
+    echo '<button type="button" id="rr-add" class="button">+ Ajouter un athlète</button>';
+    ?>
+    <script>
+    (function () {
+        var tbody = document.getElementById('result-rows-body');
+        var inp   = 'style="width:100%;padding:.3rem .4rem;border:1px solid #ddd;border-radius:4px;font-size:.88rem"';
+
+        function reindex() {
+            tbody.querySelectorAll('tr.rr').forEach(function (tr, i) {
+                tr.querySelectorAll('input').forEach(function (el) {
+                    el.name = el.name.replace(/\[\d+\]/, '[' + i + ']');
+                });
+            });
+        }
+
+        document.getElementById('rr-add').addEventListener('click', function () {
+            var i  = tbody.querySelectorAll('tr.rr').length;
+            var tr = document.createElement('tr');
+            tr.className = 'rr';
+            tr.innerHTML = "<td style='padding:.2rem .3rem'><input " + inp + " type='text' name='result_rows[" + i + "][athlete]' placeholder='Nom Prénom'></td>"
+                + "<td style='padding:.2rem .3rem'><input " + inp + " type='text' name='result_rows[" + i + "][disc]' placeholder='100m'></td>"
+                + "<td style='padding:.2rem .3rem'><input " + inp + " type='text' name='result_rows[" + i + "][perf]' placeholder='10\"85'></td>"
+                + "<td style='padding:.2rem .3rem;width:3.5rem'><input " + inp + " type='text' name='result_rows[" + i + "][place]' placeholder='1'></td>"
+                + "<td style='padding:.2rem .3rem;width:1.5rem'><button type='button' class='rr-del button-link' style='color:#a00;font-size:1rem;line-height:1' title='Supprimer'>✕</button></td>";
+            tbody.appendChild(tr);
+            tr.querySelector('input').focus();
+        });
+
+        tbody.addEventListener('click', function (e) {
+            if (e.target.classList.contains('rr-del')) {
+                e.target.closest('tr').remove();
+                reindex();
+            }
+        });
+    })();
+    </script>
+    <?php
 }
 
 function athle_record_meta_cb(WP_Post $post): void
@@ -206,10 +269,27 @@ add_action('save_post_athle_event', function (int $post_id): void {
 });
 
 add_action('save_post_athle_result', function (int $post_id): void {
-    if (!isset($_POST['athle_result_nonce']) || !wp_verify_nonce($_POST['athle_result_nonce'], 'athle_result_meta')) return;
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
-    foreach (['result_date' => '_result_date', 'result_location' => '_result_location', 'result_category' => '_result_category'] as $field => $meta) {
-        if (isset($_POST[$field])) update_post_meta($post_id, $meta, sanitize_text_field($_POST[$field]));
+
+    if (isset($_POST['athle_result_nonce']) && wp_verify_nonce($_POST['athle_result_nonce'], 'athle_result_meta')) {
+        foreach (['result_date' => '_result_date', 'result_location' => '_result_location', 'result_category' => '_result_category'] as $field => $meta) {
+            if (isset($_POST[$field])) update_post_meta($post_id, $meta, sanitize_text_field($_POST[$field]));
+        }
+    }
+
+    if (isset($_POST['athle_result_rows_nonce']) && wp_verify_nonce($_POST['athle_result_rows_nonce'], 'athle_result_rows')) {
+        $rows = [];
+        foreach ((array) ($_POST['result_rows'] ?? []) as $row) {
+            $athlete = sanitize_text_field($row['athlete'] ?? '');
+            if ($athlete === '') continue;
+            $rows[] = [
+                'athlete' => $athlete,
+                'disc'    => sanitize_text_field($row['disc']  ?? ''),
+                'perf'    => sanitize_text_field($row['perf']  ?? ''),
+                'place'   => sanitize_text_field($row['place'] ?? ''),
+            ];
+        }
+        update_post_meta($post_id, '_result_rows', wp_json_encode($rows));
     }
 });
 
@@ -455,13 +535,7 @@ add_filter('default_content', function (string $content, WP_Post $post): string 
     if ($post->post_type !== 'athle_result') return $content;
     return <<<'BLOCKS'
 <!-- wp:paragraph -->
-<p>Compte-rendu de la compétition...</p>
+<p>Compte-rendu de la compétition — conditions, ambiance, points forts...</p>
 <!-- /wp:paragraph -->
-<!-- wp:heading {"level":3} -->
-<h3>Résultats</h3>
-<!-- /wp:heading -->
-<!-- wp:table {"hasFixedLayout":true} -->
-<figure class="wp-block-table"><table><thead><tr><th>Athlète</th><th>Discipline</th><th>Performance</th><th>Place</th></tr></thead><tbody><tr><td></td><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td><td></td></tr></tbody></table></figure>
-<!-- /wp:table -->
 BLOCKS;
 }, 10, 2);

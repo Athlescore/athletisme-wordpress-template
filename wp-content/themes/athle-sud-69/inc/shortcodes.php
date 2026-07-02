@@ -181,26 +181,22 @@ add_shortcode('athle_calendar', function (array $atts): string {
 
 // ── [athle_results count="4"] ─────────────────────────────────────────────────
 
-function athle_parse_result_rows(string $content, int $max = 6): array
+function athle_parse_result_rows(int $post_id, int $max = 6): array
 {
-    if (empty(trim($content))) return [];
-    $dom = new DOMDocument();
-    @$dom->loadHTML('<?xml encoding="utf-8" ?>' . $content, LIBXML_NOERROR);
-    $rows = [];
-    $trs  = $dom->getElementsByTagName('tr');
-    foreach ($trs as $i => $tr) {
-        if ($i === 0) continue; // ignore le header
-        $cells = $tr->getElementsByTagName('td');
-        if ($cells->length < 2) continue;
-        $rows[] = [
-            'athlete' => trim($cells->item(0)->textContent),
-            'disc'    => trim($cells->item(1)->textContent),
-            'perf'    => $cells->length >= 3 ? trim($cells->item(2)->textContent) : '',
-            'place'   => $cells->length >= 4 ? trim($cells->item(3)->textContent) : '',
-        ];
-        if (count($rows) >= $max) break;
+    $stored = get_post_meta($post_id, '_result_rows', true);
+    $raw    = $stored ? json_decode($stored, true) : [];
+    $grouped = [];
+    foreach ((array) $raw as $row) {
+        $athlete = $row['athlete'] ?? '';
+        if (!$athlete) continue;
+        $entry = ($row['disc'] ?? '') . (!empty($row['perf']) ? ' — ' . $row['perf'] : '');
+        if (!isset($grouped[$athlete])) {
+            if (count($grouped) >= $max) break;
+            $grouped[$athlete] = [];
+        }
+        $grouped[$athlete][] = $entry;
     }
-    return $rows;
+    return $grouped;
 }
 
 add_shortcode('athle_results', function (array $atts): string {
@@ -233,7 +229,7 @@ add_shortcode('athle_results', function (array $atts): string {
             $date     = get_post_meta($res->ID, '_result_date', true);
             $location = get_post_meta($res->ID, '_result_location', true);
             $ts       = $date ? strtotime($date) : null;
-            $rows     = athle_parse_result_rows($res->post_content, (int) $a['rows']);
+            $rows     = athle_parse_result_rows($res->ID, (int) $a['rows']);
           ?>
           <a href="<?php echo esc_url(get_permalink($res->ID)); ?>" class="res-card reveal">
             <div class="res-card-head">
@@ -247,13 +243,10 @@ add_shortcode('athle_results', function (array $atts): string {
             </div>
             <?php if (!empty($rows)): ?>
             <div class="res-rows">
-              <?php foreach ($rows as $row): ?>
+              <?php foreach ($rows as $athlete => $entries): ?>
               <div class="res-row">
-                <strong class="res-athlete"><?php echo esc_html($row['athlete']); ?></strong>
-                <span class="res-detail">
-                  <?php echo esc_html($row['disc']); ?>
-                  <?php if ($row['perf']): ?> — <strong><?php echo esc_html($row['perf']); ?></strong><?php endif; ?>
-                </span>
+                <strong class="res-athlete"><?php echo esc_html($athlete); ?></strong>
+                <span class="res-detail"><?php echo esc_html(implode('  ·  ', $entries)); ?></span>
               </div>
               <?php endforeach; ?>
             </div>
