@@ -389,6 +389,13 @@ h1, h2, h3 {
 }
 .result-table tbody tr:last-child td { border-bottom: none; }
 .result-table tbody tr:hover { background: #f8f9fa; }
+.athlete-cat {
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--steel);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
 
 .cal-body { padding: .9rem 1rem 1.1rem; }
 .cal-date { display: flex; align-items: baseline; gap: .35rem; margin-bottom: .55rem; }

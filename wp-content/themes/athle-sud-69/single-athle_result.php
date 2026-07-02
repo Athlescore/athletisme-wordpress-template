@@ -14,6 +14,7 @@ $cats_lbl = [
     'cadet'   => 'Cadet (U18)',  'junior'  => 'Junior (U20)',
     'espoir'  => 'Espoir (U23)', 'senior'  => 'Senior',
     'master'  => 'Master',       'mixte'   => 'Toutes catégories',
+    '' => '',
 ];
 
 $stored   = get_post_meta($id, '_result_rows', true);
@@ -73,6 +74,9 @@ foreach ((array) $raw as $item) {
           <?php if ($i === 0): ?>
           <td<?php echo $count > 1 ? ' rowspan="' . $count . '" style="vertical-align:top"' : ''; ?>>
             <strong><?php echo esc_html($item['athlete']); ?></strong>
+            <?php $cat = $cats_lbl[$item['category'] ?? ''] ?? ''; if ($cat): ?>
+            <br><span class="athlete-cat"><?php echo esc_html($cat); ?></span>
+            <?php endif; ?>
           </td>
           <?php endif; ?>
           <td><?php echo esc_html($p['disc'] ?? ''); ?></td>

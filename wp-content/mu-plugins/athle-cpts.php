@@ -154,6 +154,19 @@ function athle_result_rows_meta_cb(WP_Post $post): void
         }
     }
 
+    $categories = [
+        ''        => '— Catégorie —',
+        'poussin' => 'Poussin (U10)',
+        'pupille' => 'Pupille (U12)',
+        'benjam'  => 'Benjamin (U14)',
+        'minime'  => 'Minime (U16)',
+        'cadet'   => 'Cadet (U18)',
+        'junior'  => 'Junior (U20)',
+        'espoir'  => 'Espoir (U23)',
+        'senior'  => 'Senior',
+        'master'  => 'Master',
+    ];
+
     wp_nonce_field('athle_result_rows', 'athle_result_rows_nonce');
     ?>
     <input type="hidden" name="result_rows_json" id="rr-json" value="">
@@ -166,11 +179,20 @@ function athle_result_rows_meta_cb(WP_Post $post): void
         var container = document.getElementById('rr-container');
         var hidden    = document.getElementById('rr-json');
         var IS = 'width:100%;padding:.3rem .4rem;border:1px solid #ddd;border-radius:4px;font-size:.88rem';
+        var SS = 'padding:.3rem .4rem;border:1px solid #ddd;border-radius:4px;font-size:.82rem;background:#fff';
         var TH = 'text-align:left;padding:.25rem .35rem;font-size:.75rem;color:#666;font-weight:600';
         var TD = 'padding:.2rem .3rem';
+        var CATS = <?php echo wp_json_encode($categories); ?>;
 
         function esc(v) {
             return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        function makeCatSelect(selected) {
+            var opts = Object.keys(CATS).map(function (v) {
+                return '<option value="' + esc(v) + '"' + (selected === v ? ' selected' : '') + '>' + esc(CATS[v]) + '</option>';
+            }).join('');
+            return '<select class="rr-athlete-cat" style="' + SS + '">' + opts + '</select>';
         }
 
         function sync() {
@@ -181,7 +203,11 @@ function athle_result_rows_meta_cb(WP_Post $post): void
                     var ins = tr.querySelectorAll('input[type=text]');
                     perfs.push({ disc: ins[0].value, perf: ins[1].value, place: ins[2].value });
                 });
-                athletes.push({ athlete: block.querySelector('.rr-athlete-name').value, perfs: perfs });
+                athletes.push({
+                    athlete:  block.querySelector('.rr-athlete-name').value,
+                    category: block.querySelector('.rr-athlete-cat').value,
+                    perfs:    perfs,
+                });
             });
             hidden.value = JSON.stringify(athletes);
         }
@@ -204,6 +230,7 @@ function athle_result_rows_meta_cb(WP_Post $post): void
             block.innerHTML =
                 '<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .6rem;background:#f6f7f7;border-bottom:1px solid #ddd">' +
                   '<input type="text" class="rr-athlete-name" style="' + IS + ';flex:1;font-weight:600" placeholder="Nom Prénom" value="' + esc(data.athlete||'') + '">' +
+                  makeCatSelect(data.category || '') +
                   '<button type="button" class="rr-del-athlete button-link" style="color:#a00;font-size:.82rem;white-space:nowrap">✕ Retirer</button>' +
                 '</div>' +
                 '<div style="padding:.4rem .6rem .6rem">' +
@@ -359,7 +386,7 @@ add_action('save_post_athle_result', function (int $post_id): void {
                     'place' => sanitize_text_field($p['place'] ?? ''),
                 ];
             }
-            $athletes[] = ['athlete' => $athlete, 'perfs' => $perfs];
+            $athletes[] = ['athlete' => $athlete, 'category' => sanitize_key($item['category'] ?? ''), 'perfs' => $perfs];
         }
         update_post_meta($post_id, '_result_rows', $athletes);
     }
