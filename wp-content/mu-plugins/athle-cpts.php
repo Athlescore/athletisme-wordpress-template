@@ -34,12 +34,13 @@ add_action('init', function (): void {
             'add_new_item'  => 'Ajouter un résultat',
             'edit_item'     => 'Modifier le résultat',
         ],
-        'public'       => true,
-        'show_in_menu' => true,
-        'menu_icon'    => 'dashicons-awards',
-        'supports'     => ['title', 'editor'],
-        'has_archive'  => true,
-        'rewrite'      => ['slug' => 'resultats'],
+        'public'        => true,
+        'show_in_menu'  => true,
+        'show_in_rest'  => true,
+        'menu_icon'     => 'dashicons-awards',
+        'supports'      => ['title', 'editor'],
+        'has_archive'   => true,
+        'rewrite'       => ['slug' => 'resultats'],
     ]);
 
     register_post_type('athle_record', [
@@ -59,8 +60,10 @@ add_action('init', function (): void {
 // ── Meta boxes ───────────────────────────────────────────────────────────────
 
 add_action('add_meta_boxes', function (): void {
-    add_meta_box('athle_event_meta', 'Détails de l\'événement', 'athle_event_meta_cb', 'athle_event', 'normal');
-    add_meta_box('athle_record_meta', 'Détails du record',      'athle_record_meta_cb', 'athle_record', 'normal');
+    add_meta_box('athle_event_meta',       'Détails de l\'événement', 'athle_event_meta_cb',       'athle_event',  'normal');
+    add_meta_box('athle_result_meta',      'Détails du résultat',     'athle_result_meta_cb',      'athle_result', 'normal');
+    add_meta_box('athle_result_rows_meta', 'Performances',            'athle_result_rows_meta_cb', 'athle_result', 'normal');
+    add_meta_box('athle_record_meta',      'Détails du record',       'athle_record_meta_cb',      'athle_record', 'normal');
 });
 
 function athle_event_meta_cb(WP_Post $post): void
@@ -91,6 +94,193 @@ function athle_event_meta_cb(WP_Post $post): void
         echo '<option value="' . esc_attr($val) . '"' . selected($type, $val, false) . '>' . esc_html($lbl) . '</option>';
     }
     echo '</select></label></p>';
+}
+
+function athle_result_meta_cb(WP_Post $post): void
+{
+    $date     = get_post_meta($post->ID, '_result_date', true);
+    $location = get_post_meta($post->ID, '_result_location', true);
+    $category = get_post_meta($post->ID, '_result_category', true);
+    wp_nonce_field('athle_result_meta', 'athle_result_nonce');
+    echo '<p><label><strong>Date de la compétition</strong><br>
+          <input type="date" name="result_date" value="' . esc_attr($date) . '" style="width:100%;margin-top:.3rem"></label></p>';
+    echo '<p><label><strong>Lieu</strong><br>
+          <input type="text" name="result_location" value="' . esc_attr($location) . '" style="width:100%;margin-top:.3rem" placeholder="ex: Stade de Gerland, Lyon"></label></p>';
+    echo '<p><label><strong>Catégorie</strong><br>
+          <select name="result_category" style="width:100%;margin-top:.3rem">';
+    foreach ([
+        ''        => '— Non précisée —',
+        'poussin' => 'Poussin (U10)',
+        'pupille' => 'Pupille (U12)',
+        'benjam'  => 'Benjamin (U14)',
+        'minime'  => 'Minime (U16)',
+        'cadet'   => 'Cadet (U18)',
+        'junior'  => 'Junior (U20)',
+        'espoir'  => 'Espoir (U23)',
+        'senior'  => 'Senior',
+        'master'  => 'Master',
+        'mixte'   => 'Toutes catégories',
+    ] as $val => $lbl) {
+        echo '<option value="' . esc_attr($val) . '"' . selected($category, $val, false) . '>' . esc_html($lbl) . '</option>';
+    }
+    echo '</select></label></p>';
+}
+
+function athle_result_rows_meta_cb(WP_Post $post): void
+{
+    $raw = get_post_meta($post->ID, '_result_rows', true);
+    if (is_array($raw)) {
+        $stored_array = $raw;
+    } elseif ($raw) {
+        $stored_array = json_decode($raw, true) ?: [];
+    } else {
+        $stored_array = [];
+    }
+
+    // Migre l'ancien format plat [{athlete,disc,perf,place}] vers [{athlete,perfs:[…]}]
+    $normalized = [];
+    foreach ($stored_array as $item) {
+        if (isset($item['perfs'])) {
+            $normalized[] = $item;
+        } else {
+            $name  = $item['athlete'] ?? '';
+            $entry = ['disc' => $item['disc'] ?? '', 'perf' => $item['perf'] ?? '', 'place' => $item['place'] ?? ''];
+            $found = false;
+            foreach ($normalized as &$n) {
+                if ($n['athlete'] === $name) { $n['perfs'][] = $entry; $found = true; break; }
+            }
+            unset($n);
+            if (!$found) $normalized[] = ['athlete' => $name, 'perfs' => [$entry]];
+        }
+    }
+
+    $categories = [
+        ''        => '— Catégorie —',
+        'poussin' => 'Poussin (U10)',
+        'pupille' => 'Pupille (U12)',
+        'benjam'  => 'Benjamin (U14)',
+        'minime'  => 'Minime (U16)',
+        'cadet'   => 'Cadet (U18)',
+        'junior'  => 'Junior (U20)',
+        'espoir'  => 'Espoir (U23)',
+        'senior'  => 'Senior',
+        'master'  => 'Master',
+    ];
+
+    wp_nonce_field('athle_result_rows', 'athle_result_rows_nonce');
+    ?>
+    <input type="hidden" name="result_rows_json" id="rr-json" value="">
+    <div id="rr-data" data-rows="<?php echo esc_attr(wp_json_encode($normalized)); ?>" hidden></div>
+    <div id="rr-container"></div>
+    <button type="button" id="rr-add-athlete" class="button" style="margin-top:.5rem">+ Ajouter un athlète</button>
+    <script>
+    (function () {
+        var stored    = JSON.parse(document.getElementById('rr-data').getAttribute('data-rows') || '[]');
+        var container = document.getElementById('rr-container');
+        var hidden    = document.getElementById('rr-json');
+        var IS = 'width:100%;padding:.3rem .4rem;border:1px solid #ddd;border-radius:4px;font-size:.88rem';
+        var SS = 'padding:.3rem .4rem;border:1px solid #ddd;border-radius:4px;font-size:.82rem;background:#fff';
+        var TH = 'text-align:left;padding:.25rem .35rem;font-size:.75rem;color:#666;font-weight:600';
+        var TD = 'padding:.2rem .3rem';
+        var CATS = <?php echo wp_json_encode($categories); ?>;
+
+        function esc(v) {
+            return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        function makeCatSelect(selected) {
+            var opts = Object.keys(CATS).map(function (v) {
+                return '<option value="' + esc(v) + '"' + (selected === v ? ' selected' : '') + '>' + esc(CATS[v]) + '</option>';
+            }).join('');
+            return '<select class="rr-athlete-cat" style="' + SS + '">' + opts + '</select>';
+        }
+
+        function sync() {
+            var athletes = [];
+            container.querySelectorAll('.rr-athlete-block').forEach(function (block) {
+                var perfs = [];
+                block.querySelectorAll('.rr-perf-row').forEach(function (tr) {
+                    var ins = tr.querySelectorAll('input[type=text]');
+                    perfs.push({ disc: ins[0].value, perf: ins[1].value, place: ins[2].value });
+                });
+                athletes.push({
+                    athlete:  block.querySelector('.rr-athlete-name').value,
+                    category: block.querySelector('.rr-athlete-cat').value,
+                    perfs:    perfs,
+                });
+            });
+            hidden.value = JSON.stringify(athletes);
+        }
+
+        function makePerfRow(p) {
+            var tr = document.createElement('tr');
+            tr.className = 'rr-perf-row';
+            tr.innerHTML =
+                '<td style="' + TD + '"><input type="text" style="' + IS + '" placeholder="100m" value="' + esc(p.disc||'') + '"></td>' +
+                '<td style="' + TD + '"><input type="text" style="' + IS + '" placeholder="10\'85" value="' + esc(p.perf||'') + '"></td>' +
+                '<td style="' + TD + ';width:3.5rem"><input type="text" style="' + IS + '" placeholder="1" value="' + esc(p.place||'') + '"></td>' +
+                '<td style="' + TD + ';width:1.5rem"><button type="button" class="rr-del-perf button-link" style="color:#a00;font-size:1rem;line-height:1" title="Supprimer">✕</button></td>';
+            return tr;
+        }
+
+        function makeAthleteBlock(data) {
+            var block = document.createElement('div');
+            block.className = 'rr-athlete-block';
+            block.style.cssText = 'border:1px solid #ddd;border-radius:4px;margin-bottom:.75rem;overflow:hidden';
+            block.innerHTML =
+                '<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .6rem;background:#f6f7f7;border-bottom:1px solid #ddd">' +
+                  '<input type="text" class="rr-athlete-name" style="' + IS + ';flex:1;font-weight:600" placeholder="Nom Prénom" value="' + esc(data.athlete||'') + '">' +
+                  makeCatSelect(data.category || '') +
+                  '<button type="button" class="rr-del-athlete button-link" style="color:#a00;font-size:.82rem;white-space:nowrap">✕ Retirer</button>' +
+                '</div>' +
+                '<div style="padding:.4rem .6rem .6rem">' +
+                  '<table style="width:100%;border-collapse:collapse">' +
+                    '<thead><tr>' +
+                      '<th style="' + TH + '">Discipline</th>' +
+                      '<th style="' + TH + '">Performance</th>' +
+                      '<th style="' + TH + ';width:3.5rem">Place</th>' +
+                      '<th></th>' +
+                    '</tr></thead>' +
+                    '<tbody class="rr-perf-body"></tbody>' +
+                  '</table>' +
+                  '<button type="button" class="rr-add-perf button-link" style="margin-top:.35rem;font-size:.82rem;color:#0073aa">+ Ajouter une épreuve</button>' +
+                '</div>';
+            var tbody = block.querySelector('.rr-perf-body');
+            ((data.perfs && data.perfs.length) ? data.perfs : [{}]).forEach(function (p) {
+                tbody.appendChild(makePerfRow(p));
+            });
+            return block;
+        }
+
+        (stored.length ? stored : [{}]).forEach(function (a) { container.appendChild(makeAthleteBlock(a)); });
+        sync();
+
+        var form = document.getElementById('post');
+        if (form) form.addEventListener('submit', sync);
+
+        document.getElementById('rr-add-athlete').addEventListener('click', function () {
+            var block = makeAthleteBlock({});
+            container.appendChild(block);
+            block.querySelector('.rr-athlete-name').focus();
+            sync();
+        });
+
+        container.addEventListener('click', function (e) {
+            if (e.target.classList.contains('rr-del-athlete')) {
+                e.target.closest('.rr-athlete-block').remove(); sync();
+            }
+            if (e.target.classList.contains('rr-del-perf')) {
+                e.target.closest('tr').remove(); sync();
+            }
+            if (e.target.classList.contains('rr-add-perf')) {
+                var tbody = e.target.closest('.rr-athlete-block').querySelector('.rr-perf-body');
+                tbody.appendChild(makePerfRow({})); sync();
+            }
+        });
+        container.addEventListener('input', sync);
+    })();
+    </script>
+    <?php
 }
 
 function athle_record_meta_cb(WP_Post $post): void
@@ -173,6 +363,35 @@ add_action('save_post_athle_event', function (int $post_id): void {
     }
 });
 
+add_action('save_post_athle_result', function (int $post_id): void {
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
+
+    if (isset($_POST['athle_result_nonce']) && wp_verify_nonce($_POST['athle_result_nonce'], 'athle_result_meta')) {
+        foreach (['result_date' => '_result_date', 'result_location' => '_result_location', 'result_category' => '_result_category'] as $field => $meta) {
+            if (isset($_POST[$field])) update_post_meta($post_id, $meta, sanitize_text_field($_POST[$field]));
+        }
+    }
+
+    if (isset($_POST['athle_result_rows_nonce']) && wp_verify_nonce($_POST['athle_result_rows_nonce'], 'athle_result_rows')) {
+        $raw      = json_decode(wp_unslash($_POST['result_rows_json'] ?? '[]'), true);
+        $athletes = [];
+        foreach ((array) $raw as $item) {
+            $athlete = sanitize_text_field($item['athlete'] ?? '');
+            if ($athlete === '') continue;
+            $perfs = [];
+            foreach ((array) ($item['perfs'] ?? []) as $p) {
+                $perfs[] = [
+                    'disc'  => sanitize_text_field($p['disc']  ?? ''),
+                    'perf'  => sanitize_text_field($p['perf']  ?? ''),
+                    'place' => sanitize_text_field($p['place'] ?? ''),
+                ];
+            }
+            $athletes[] = ['athlete' => $athlete, 'category' => sanitize_key($item['category'] ?? ''), 'perfs' => $perfs];
+        }
+        update_post_meta($post_id, '_result_rows', $athletes);
+    }
+});
+
 add_action('save_post_athle_record', function (int $post_id): void {
     if (!isset($_POST['athle_record_nonce']) || !wp_verify_nonce($_POST['athle_record_nonce'], 'athle_record_meta')) return;
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
@@ -180,6 +399,12 @@ add_action('save_post_athle_record', function (int $post_id): void {
         if (isset($_POST[$field])) update_post_meta($post_id, '_' . $field, sanitize_text_field($_POST[$field]));
     }
 });
+
+// ── Éditeur classique pour les résultats (méta boxes dans la sidebar) ────────
+
+add_filter('use_block_editor_for_post_type', function (bool $use, string $post_type): bool {
+    return $post_type === 'athle_result' ? false : $use;
+}, 10, 2);
 
 // ── Géocodage Nominatim ──────────────────────────────────────────────────────
 
@@ -360,4 +585,66 @@ add_action('admin_menu', function (): void {
             'post-new.php?post_type=athle_event&event_type=' . $type
         );
     }
+
+    add_submenu_page(
+        'edit.php?post_type=athle_result',
+        '+ Nouveau résultat', '+ Nouveau résultat',
+        'edit_posts',
+        'post-new.php?post_type=athle_result'
+    );
 });
+
+// ── Colonnes admin — Résultats ───────────────────────────────────────────────
+
+add_filter('manage_athle_result_posts_columns', function (array $cols): array {
+    unset($cols['date']);
+    return array_merge($cols, [
+        'result_date'     => 'Date',
+        'result_location' => 'Lieu',
+        'result_category' => 'Catégorie',
+    ]);
+});
+
+add_action('manage_athle_result_posts_custom_column', function (string $col, int $post_id): void {
+    $categories = [
+        'poussin' => 'Poussin (U10)', 'pupille' => 'Pupille (U12)',
+        'benjam'  => 'Benjamin (U14)', 'minime' => 'Minime (U16)',
+        'cadet'   => 'Cadet (U18)',   'junior' => 'Junior (U20)',
+        'espoir'  => 'Espoir (U23)',  'senior' => 'Senior',
+        'master'  => 'Master',        'mixte'  => 'Toutes catégories',
+    ];
+    match ($col) {
+        'result_date'     => print(esc_html(get_post_meta($post_id, '_result_date', true) ?: '—')),
+        'result_location' => print(esc_html(get_post_meta($post_id, '_result_location', true) ?: '—')),
+        'result_category' => print(esc_html($categories[get_post_meta($post_id, '_result_category', true)] ?? '—')),
+        default           => null,
+    };
+}, 10, 2);
+
+add_filter('manage_edit-athle_result_sortable_columns', function (array $cols): array {
+    $cols['result_date'] = 'result_date';
+    return $cols;
+});
+
+add_action('pre_get_posts', function (WP_Query $q): void {
+    if (!is_admin() || $q->get('post_type') !== 'athle_result' || !$q->is_main_query()) return;
+    if ($q->get('orderby') === 'result_date') {
+        $q->set('meta_query', [
+            'relation' => 'OR',
+            'with_date'    => ['key' => '_result_date', 'compare' => 'EXISTS'],
+            'without_date' => ['key' => '_result_date', 'compare' => 'NOT EXISTS'],
+        ]);
+        $q->set('orderby', ['with_date' => 'DESC', 'post_date' => 'DESC']);
+    }
+});
+
+// ── Template de blocs — Résultats ────────────────────────────────────────────
+
+add_filter('default_content', function (string $content, WP_Post $post): string {
+    if ($post->post_type !== 'athle_result') return $content;
+    return <<<'BLOCKS'
+<!-- wp:paragraph -->
+<p>Compte-rendu de la compétition — conditions, ambiance, points forts...</p>
+<!-- /wp:paragraph -->
+BLOCKS;
+}, 10, 2);

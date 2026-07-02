@@ -181,16 +181,50 @@ add_shortcode('athle_calendar', function (array $atts): string {
 
 // ── [athle_results count="4"] ─────────────────────────────────────────────────
 
+function athle_parse_result_rows(int $post_id, int $max = 6): array
+{
+    $stored = get_post_meta($post_id, '_result_rows', true);
+    $raw    = is_array($stored) ? $stored : ($stored ? json_decode($stored, true) : []);
+    $grouped = [];
+    foreach ((array) $raw as $item) {
+        if (isset($item['perfs'])) {
+            // Nouveau format {athlete, perfs:[{disc,perf,place}]}
+            $athlete = $item['athlete'] ?? '';
+            if (!$athlete) continue;
+            if (!isset($grouped[$athlete])) {
+                if (count($grouped) >= $max) break;
+                $grouped[$athlete] = [];
+            }
+            foreach ((array) $item['perfs'] as $p) {
+                $grouped[$athlete][] = ($p['disc'] ?? '') . (!empty($p['perf']) ? ' — ' . $p['perf'] : '');
+            }
+        } else {
+            // Ancien format plat {athlete, disc, perf, place}
+            $athlete = $item['athlete'] ?? '';
+            if (!$athlete) continue;
+            if (!isset($grouped[$athlete])) {
+                if (count($grouped) >= $max) break;
+                $grouped[$athlete] = [];
+            }
+            $grouped[$athlete][] = ($item['disc'] ?? '') . (!empty($item['perf']) ? ' — ' . $item['perf'] : '');
+        }
+    }
+    return $grouped;
+}
+
 add_shortcode('athle_results', function (array $atts): string {
-    $a = shortcode_atts(['count' => 4, 'title' => 'Derniers résultats', 'eyebrow' => 'En compétition'], $atts);
-    ob_start();
+    $a = shortcode_atts(['count' => 4, 'title' => 'Derniers résultats', 'eyebrow' => 'En compétition', 'rows' => 5], $atts);
+
     $results = get_posts([
         'post_type'   => 'athle_result',
         'numberposts' => (int) $a['count'],
         'post_status' => 'publish',
-        'orderby'     => 'date',
+        'meta_key'    => '_result_date',
+        'orderby'     => 'meta_value',
         'order'       => 'DESC',
     ]);
+
+    ob_start();
     ?>
     <section id="resultats" class="wrap sec-block">
       <div class="sec-head">
@@ -203,20 +237,36 @@ add_shortcode('athle_results', function (array $atts): string {
       <?php if (empty($results)): ?>
         <p style="color:var(--steel);font-size:1.05rem">Aucun résultat disponible pour le moment.</p>
       <?php else: ?>
-        <div class="home-res-grid">
-          <?php foreach ($results as $res): ?>
-          <div class="home-res-card reveal">
-            <div class="pub-evt-header" style="padding:.65rem .9rem .45rem;flex-direction:column;gap:.15rem;align-items:stretch">
-              <div style="display:flex;justify-content:space-between;align-items:baseline;gap:.5rem">
-                <span class="pub-eh-date"><?php echo get_the_date('d/m/Y', $res->ID); ?></span>
+        <div class="res-grid">
+          <?php foreach ($results as $res):
+            $date     = get_post_meta($res->ID, '_result_date', true);
+            $location = get_post_meta($res->ID, '_result_location', true);
+            $ts       = $date ? strtotime($date) : null;
+            $rows     = athle_parse_result_rows($res->ID, (int) $a['rows']);
+          ?>
+          <a href="<?php echo esc_url(get_permalink($res->ID)); ?>" class="res-card reveal">
+            <div class="res-card-head">
+              <?php if ($ts): ?>
+                <span class="res-card-date"><?php echo date('d/m/Y', $ts); ?></span>
+              <?php endif; ?>
+              <?php if ($location): ?>
+                <span class="res-card-loc"><?php echo esc_html($location); ?></span>
+              <?php endif; ?>
+              <h3 class="res-card-title"><?php echo esc_html($res->post_title); ?></h3>
+            </div>
+            <?php if (!empty($rows)): ?>
+            <div class="res-rows">
+              <?php foreach ($rows as $athlete => $entries): ?>
+              <div class="res-row">
+                <strong class="res-athlete"><?php echo esc_html($athlete); ?></strong>
+                <span class="res-detail"><?php echo esc_html(implode('  ·  ', $entries)); ?></span>
               </div>
-              <span class="pub-eh-name" style="font-size:1rem"><?php echo esc_html($res->post_title); ?></span>
+              <?php endforeach; ?>
             </div>
-            <div class="pub-res-list" style="margin-bottom:0">
-              <?php echo wp_kses_post(apply_filters('the_content', $res->post_content)); ?>
-            </div>
-          </div>
-          <?php endforeach; wp_reset_postdata(); ?>
+            <?php endif; ?>
+            <div class="res-card-more">Voir le détail →</div>
+          </a>
+          <?php endforeach; ?>
         </div>
       <?php endif; ?>
     </section>
