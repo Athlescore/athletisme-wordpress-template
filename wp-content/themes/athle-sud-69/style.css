@@ -282,6 +282,7 @@ h1, h2, h3 {
 .cal-type--club        .cal-banner { background: var(--ink); }
 .cal-type--training    .cal-banner { background: var(--steel); }
 .cal-type--meeting     .cal-banner { background: #7C3AED; }
+.cal-type--result      .cal-banner { background: #059669; }
 .cal-body { padding: .9rem 1rem 1.1rem; }
 .cal-date { display: flex; align-items: baseline; gap: .35rem; margin-bottom: .55rem; }
 .cal-day {

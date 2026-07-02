@@ -183,14 +183,26 @@ add_shortcode('athle_calendar', function (array $atts): string {
 
 add_shortcode('athle_results', function (array $atts): string {
     $a = shortcode_atts(['count' => 4, 'title' => 'Derniers résultats', 'eyebrow' => 'En compétition'], $atts);
-    ob_start();
+
+    $mois = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+    $cats = [
+        'poussin' => 'Poussin', 'pupille' => 'Pupille',
+        'benjam'  => 'Benjamin','minime'  => 'Minime',
+        'cadet'   => 'Cadet',  'junior'  => 'Junior',
+        'espoir'  => 'Espoir', 'senior'  => 'Senior',
+        'master'  => 'Master', 'mixte'   => 'Toutes catégories',
+    ];
+
     $results = get_posts([
         'post_type'   => 'athle_result',
         'numberposts' => (int) $a['count'],
         'post_status' => 'publish',
-        'orderby'     => 'date',
+        'meta_key'    => '_result_date',
+        'orderby'     => 'meta_value',
         'order'       => 'DESC',
     ]);
+
+    ob_start();
     ?>
     <section id="resultats" class="wrap sec-block">
       <div class="sec-head">
@@ -203,20 +215,28 @@ add_shortcode('athle_results', function (array $atts): string {
       <?php if (empty($results)): ?>
         <p style="color:var(--steel);font-size:1.05rem">Aucun résultat disponible pour le moment.</p>
       <?php else: ?>
-        <div class="home-res-grid">
-          <?php foreach ($results as $res): ?>
-          <div class="home-res-card reveal">
-            <div class="pub-evt-header" style="padding:.65rem .9rem .45rem;flex-direction:column;gap:.15rem;align-items:stretch">
-              <div style="display:flex;justify-content:space-between;align-items:baseline;gap:.5rem">
-                <span class="pub-eh-date"><?php echo get_the_date('d/m/Y', $res->ID); ?></span>
+        <div class="calendar-grid">
+          <?php foreach ($results as $res):
+            $date     = get_post_meta($res->ID, '_result_date', true);
+            $location = get_post_meta($res->ID, '_result_location', true);
+            $cat      = get_post_meta($res->ID, '_result_category', true);
+            $ts       = $date ? strtotime($date) : null;
+            $cat_lbl  = $cats[$cat] ?? 'Résultats';
+          ?>
+          <a href="<?php echo esc_url(get_permalink($res->ID)); ?>" class="cal-card cal-type--result reveal">
+            <div class="cal-banner"><?php echo esc_html($cat_lbl); ?></div>
+            <div class="cal-body">
+              <div class="cal-date">
+                <span class="cal-day"><?php echo $ts ? date('d', $ts) : '—'; ?></span>
+                <span class="cal-month"><?php echo $ts ? $mois[(int)date('n', $ts) - 1] : ''; ?></span>
               </div>
-              <span class="pub-eh-name" style="font-size:1rem"><?php echo esc_html($res->post_title); ?></span>
+              <h3 class="cal-title"><?php echo esc_html($res->post_title); ?></h3>
+              <?php if ($location): ?>
+                <div class="cal-where"><?php echo esc_html($location); ?></div>
+              <?php endif; ?>
             </div>
-            <div class="pub-res-list" style="margin-bottom:0">
-              <?php echo wp_kses_post(apply_filters('the_content', $res->post_content)); ?>
-            </div>
-          </div>
-          <?php endforeach; wp_reset_postdata(); ?>
+          </a>
+          <?php endforeach; ?>
         </div>
       <?php endif; ?>
     </section>
