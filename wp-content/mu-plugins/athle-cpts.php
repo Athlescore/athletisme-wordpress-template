@@ -18,12 +18,13 @@ add_action('init', function (): void {
             'add_new_item'  => 'Ajouter un événement',
             'edit_item'     => 'Modifier l\'événement',
         ],
-        'public'       => true,
-        'show_in_menu' => true,
-        'menu_icon'    => 'dashicons-calendar-alt',
-        'supports'     => ['title', 'editor'],
-        'has_archive'  => true,
-        'rewrite'      => ['slug' => 'agenda'],
+        'public'        => true,
+        'show_in_menu'  => true,
+        'show_in_rest'  => true,
+        'menu_icon'     => 'dashicons-calendar-alt',
+        'supports'      => ['title', 'editor'],
+        'has_archive'   => true,
+        'rewrite'       => ['slug' => 'agenda'],
     ]);
 
     register_post_type('athle_result', [
