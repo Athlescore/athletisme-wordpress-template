@@ -229,9 +229,9 @@ h1, h2, h3 {
 .foot-bottom { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid rgba(255,255,255,.12); font-size: .85rem; }
 
 /* ── Article ─────────────────────────────────────────────── */
-.article-head { max-width: 780px; margin: 0 auto; padding-block: 1.4rem 2.2rem; }
+.article-head { padding-block: 1.4rem 2.2rem; }
 .article-head h1 { font-size: clamp(2.2rem, 5.5vw, 3.9rem); margin-top: .7rem; text-transform: none; line-height: 1.05; }
-.article-body { max-width: 780px; margin: 2.6rem auto 0; font-size: 1.08rem; line-height: 1.78; color: #20262f; padding-bottom: clamp(3rem, 6vw, 5rem); }
+.article-body { margin-top: 2.6rem; font-size: 1.08rem; line-height: 1.78; color: #20262f; padding-bottom: clamp(3rem, 6vw, 5rem); }
 .article-body p { margin-bottom: 1.3em; }
 .article-body h2 { font-size: 1.7rem; color: var(--ink); margin: 1.9em 0 .55em; display: flex; align-items: center; gap: .6rem; text-transform: uppercase; }
 .article-body h2::before { content:""; width:26px; height:4px; background:var(--track); flex:none; border-radius:2px; }
