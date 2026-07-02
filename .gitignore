@@ -1,0 +1,13 @@
+# Dépendances PHP
+vendor/
+
+# Uploads WordPress (médias)
+wp-content/uploads/
+
+# Fichiers systèmes
+.DS_Store
+Thumbs.db
+
+# Variables d'environnement
+.env
+.env.local

@@ -1,0 +1,11 @@
+{
+    "name": "athle-sud-69/wordpress",
+    "description": "Thème WordPress Athlé Sud 69",
+    "type": "project",
+    "require-dev": {
+        "php-stubs/wordpress-stubs": "^6.8"
+    },
+    "config": {
+        "allow-plugins": false
+    }
+}
