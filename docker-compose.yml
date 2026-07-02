@@ -12,6 +12,7 @@ services:
     volumes:
       - wp_data:/var/www/html
       - ./wp-content/themes/athle-sud-69:/var/www/html/wp-content/themes/athle-sud-69
+      - ./wp-content/mu-plugins:/var/www/html/wp-content/mu-plugins
     depends_on:
       db:
         condition: service_healthy
