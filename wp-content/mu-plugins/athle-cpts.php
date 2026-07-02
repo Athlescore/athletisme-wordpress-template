@@ -219,9 +219,8 @@ add_shortcode('athle_map', function (): string {
     $title   = esc_html(get_the_title($id));
     $address = nl2br(esc_html($loc));
     $osm_url = esc_url('https://www.openstreetmap.org/?mlat=' . $lat . '&mlon=' . $lng . '#map=15/' . $lat . '/' . $lng);
-    $popup   = esc_js($loc ?: $title);
 
-    $GLOBALS['athle_maps'][$map_id] = ['lat' => $lat, 'lng' => $lng, 'popup' => $popup];
+    $GLOBALS['athle_maps'][$map_id] = ['lat' => $lat, 'lng' => $lng, 'popup' => get_the_title($id)];
 
     wp_enqueue_style('leaflet',  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css', [], '1.9.4');
     wp_enqueue_script('leaflet', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',  [], '1.9.4', true);
