@@ -12,11 +12,14 @@
   <div class="wrap nav">
     <a href="<?php echo esc_url(home_url('/')); ?>" class="brand" aria-label="<?php bloginfo('name'); ?> — Accueil">
       <?php
-        $logo_id = get_theme_mod('custom_logo');
+        $logo_id   = get_theme_mod('custom_logo');
+        $icon_url  = get_site_icon_url(96);
         if ($logo_id):
           $logo = wp_get_attachment_image_src($logo_id, 'full');
       ?>
         <span class="brand-mark"><img src="<?php echo esc_url($logo[0]); ?>" alt="" width="46" height="46"></span>
+      <?php elseif ($icon_url): ?>
+        <span class="brand-mark"><img src="<?php echo esc_url($icon_url); ?>" alt="" width="46" height="46"></span>
       <?php else: ?>
         <span class="brand-mark" aria-hidden="true"></span>
       <?php endif; ?>
